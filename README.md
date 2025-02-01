@@ -1,2 +1,69 @@
-# Recause
-Recause is a meta-framework that re-runs flows from the start using exceptions to handle partial data or async input, storing everything in one serializable, even portable state. ChatWizard is a sample UI framework leveraging Recause for chat-like wizards. Author flows in plain JS, easily skipping or editing previously answered steps.
+# Recause & ChatWizard
+
+**A minimal JavaScript meta-framework (Recause) and a chat-style UI layer (ChatWizard) for building step-by-step flows**.
+
+This approach “pauses” your flow at each prompt by throwing an exception, then re-runs the same function from the start whenever new data arrives—skipping any steps whose data is already known.
+
+---
+
+## Recause (Meta-Framework)
+
+1. **Exception-Based “Pause & Resume”**  
+   - Write a single function describing your entire flow.  
+   - When new data is needed, Recause throws an exception to halt, then re-runs the flow once that data is available.
+
+2. **Single State Object (Portable & Serializable)**  
+   - All data (progress, answers, partial inputs) is stored in a single JSON-friendly object.  
+   - Easily persist or transport flows mid-execution—pick up exactly where you left off on another device or server.
+
+3. **Fully Programmable Flows**  
+   - Use standard JavaScript (loops, conditionals, async calls, etc.)—no specialized DSL or rigid state machines.  
+   - Can run in the browser or Node.js, making it suitable for diverse environments.
+
+4. **Beyond User Prompts**  
+   - Although showcased with a chat UI, Recause works for any **incremental data or async** scenario where a linear flow needs to pause until more info arrives.
+
+---
+
+## ChatWizard (UI Framework on Recause)
+
+1. **Chat-Style Interface**  
+   - Provides straightforward methods like `askText`, `askRadio`, `askCheckbox`, etc.  
+   - Displays previously given answers in read-only mode until edited, automatically skipping those steps on re-run.
+
+2. **Automatic Flow Replay**  
+   - Hooks into Recause’s mechanism to re-run your flow whenever new input is submitted.  
+   - Skips already answered questions, unless the user chooses to edit them.
+
+3. **Clean Separation of Concerns**  
+   - ChatWizard handles UI rendering and flow invocation.  
+   - Recause manages the flow logic and state storage.  
+   - Your domain flow remains plain JavaScript.
+
+4. **Minimal & Extensible**  
+   - No heavy dependencies—just DOM manipulation for a simple chat-like experience.  
+   - Swap out ChatWizard for another layer (CLI, React, Vue, etc.) if you prefer.
+
+---
+
+### Example Flow
+
+A “house survey” example is provided:
+- Asks how many houses you have  
+- Collects address, region, amenities for each house  
+- Ends with final remarks  
+- Stores all data in Recause’s single state object
+
+You can **serialize** that state any time and **reload** it later—resuming exactly where you left off!
+
+---
+
+### License
+
+[MIT](LICENSE)
+
+---
+
+### Contributing
+
+Suggestions, bug reports, and pull requests are welcome! Feel free to open an issue or PR. Together, let’s make incremental flow logic simpler and more powerful.
