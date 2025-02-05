@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Chat flow built with ChatWizard Framework built with Recause Metaframework</title>
+  <title>A Vacation Planning Chatbot based on the ChatWizard Framework and the Recause Framework</title>
   <style>
     body {
       margin: 0;
       padding: 0;
       background: #000;
-      font-family: "Helvetica", sans-serif; /* helvetica */
+      font-family: "Helvetica", sans-serif;
       font-size: 18px;
       color: #eee;
     }
@@ -46,7 +46,7 @@
       background: #666;
     }
     .question-text {
-      color: #ff9900; /* orange question text */
+      color: #ff9900; /* orange */
       font-weight: bold;
       margin-bottom: 6px;
     }
@@ -78,6 +78,7 @@
       padding: 4px 8px;
       border-radius: 4px;
       font-family: inherit;
+      margin: 2px;
     }
     button:hover {
       background: #666;
@@ -89,6 +90,11 @@
       margin-left: 4px;
       cursor: pointer;
     }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
   </style>
 </head>
 <body>
@@ -97,10 +103,31 @@
 
 <script>
 /*******************************************************************************
- * 1) Recause Metaframework
- *    - We throw StopFlow to pause a flow.
- *    - The RecauseEngine stores all data in this.state.
- *    - The state can be transported and the flow continued elsewhere.
+ * (1) Recause Framework
+ *     - Supports frameworks and applications based on the recause programming
+ *       model. Can be considered a metaframework as unlikely used on its own.
+ *     - The programming model iterates over the same single flow (a programming
+ *       language function) until the purpose of the flow is fulfilled.
+ *       The purpose is fulfilled once a certain flow state associated with the
+ *       engine instance running the flow has been reached. Then the iterations
+ *       and the engine instance stop and the remaining state can be used.
+ *       The flow can be arbitrarily complex and stop its own execution at any
+ *       point, typically whenever necessary state is missing. Once new state
+ *       is considered to have become available the next iteration starts.
+ *       The programming model allows for very concisely defined domain-specific
+ *       flows. And it is suitable to build derived frameworks for specific
+ *       types of domain applications, making the domain-specific flows even 
+ *       more concise.
+ *     - The programming model - by making all relevant engine instance state
+ *       explicit - allows for flows to move freely between engines running
+ *       the same flow. So an executing flow is portable by suspending the
+ *       flow execution and serialising the state in the original engine
+ *       and loading the state and resuming the flow execution in the new
+ *       engine.
+ *     - The Recause Framework is new and unrefined. It has a number of 
+ *       supporting functions that may be useful but may turn out to be 
+ *       superfluous. Likely other supporting functions would be desirable
+ *       and we only find out over time. Feedback is welcome, enjoy!
  ******************************************************************************/
 class StopFlow extends Error {
   constructor() {
@@ -108,35 +135,60 @@ class StopFlow extends Error {
     this.name = "StopFlow";
   }
 }
+class RestartFlow extends Error {
+  constructor() {
+    super("RestartFlow");
+    this.name = "RestartFlow";
+  }
+}
 
 class RecauseEngine {
   constructor(savedState) {
-    // If savedState is a JSON string, parse it. If object, use it; else empty.
     let initialData = {};
     if (typeof savedState === 'string') {
       try {
         initialData = JSON.parse(savedState);
       } catch (e) {
-        console.warn("Failed to parse saved state JSON:", e);
+        // ignoring parse errors for now
       }
     } else if (typeof savedState === 'object' && savedState !== null) {
       initialData = savedState;
     }
     this.state = { ...initialData };
+
+    // Snapshots: 1-run-ago, 2-runs-ago. Not certain yet if these are useful.
+    this.stateBefore = {};
+    this.state2Before = {};
+
+    this.changeCount = 0; // global revision counter of state items
+    this.stateKeyChangeCount = {};
+
+    // For the "before" snapshots
+    this.stateKeyChangeCountBefore  = {};
+    this.stateKeyChangeCount2Before = {};
   }
 
-  runFlow(flowFn, frameworkAPI) {
-    try {
-      const recauseApi = {
-        ...frameworkAPI,
-        recause: this
-      };
-      flowFn(recauseApi);
-    } catch(e) {
-      if (!(e instanceof StopFlow)) {
-        throw e;
+  runFlow(flowFn) {
+    while (true) {
+      // SHIFT older snapshots
+      this.state2Before = JSON.parse(JSON.stringify(this.stateBefore));
+      this.stateBefore  = JSON.parse(JSON.stringify(this.state));
+
+      this.stateKeyChangeCount2Before = JSON.parse(JSON.stringify(this.stateKeyChangeCountBefore));
+      this.stateKeyChangeCountBefore  = JSON.parse(JSON.stringify(this.stateKeyChangeCount));
+
+      try {
+        flowFn({ recause: this });
+        break;
+      } catch(e) {
+        if (e instanceof StopFlow) {
+          break; // normal pause => done
+        } else if (e instanceof RestartFlow) {
+          continue; // re-run from top
+        } else {
+          throw e;
+        }
       }
-      // If it's StopFlow, we stop quietly
     }
   }
 
@@ -144,29 +196,75 @@ class RecauseEngine {
     throw new StopFlow();
   }
 
-  // Basic state methods
+  reRunNow() {
+    throw new RestartFlow();
+  }
+
   hasState(key) {
     return Object.prototype.hasOwnProperty.call(this.state, key);
   }
   getState(key) {
     return this.state[key];
   }
-  setState(key, value) {
-    this.state[key] = value;
-  }
-  removeState(key) {
-    delete this.state[key];
+
+  setState(key, newVal) {
+    const oldVal = this.state[key];
+    if (oldVal === newVal) {
+      return; // no increment if the value didn’t actually change
+    }
+    this.changeCount++; // keep track of how recent the state is
+    this.stateKeyChangeCount[key] = this.changeCount;
+    this.state[key] = newVal;
   }
 
-  // Optional “guard” or “defaults”
-  getStateElseStop(key) {
-    if (!this.hasState(key)) {
-      this.stopHere();
-    }
-    return this.getState(key);
+  touchState(key) {
+    this.changeCount++; // make state recent without actually changing it
+    this.stateKeyChangeCount[key] = this.changeCount;
   }
-  getStateOrDefault(key, defaultVal) {
-    return this.hasState(key) ? this.getState(key) : defaultVal;
+
+  removeState(key) {
+    delete this.state[key];
+    // optional: delete this.stateKeyChangeCount[key];
+    // for now we keep the state's metadata, not certain if useful
+  }
+
+  ageState(key) {
+    const rev = this.stateKeyChangeCount[key];
+    if (!rev) return Infinity; // if it was never set the age is Infinity
+    return (this.changeCount - rev) + 1;
+  }
+
+  forceStateOrder(firstKey, subsequentKey) {
+    const a1 = this.ageState(firstKey);
+    const a2 = this.ageState(subsequentKey);
+    if (!(a1 > a2)) {
+      this.removeState(subsequentKey); // if an order relation is needed we enforce it
+    }
+  }
+
+  // "before" snapshot helpers
+  hasStateBefore(key) {
+    return Object.prototype.hasOwnProperty.call(this.stateBefore, key);
+  }
+  getStateBefore(key) {
+    return this.stateBefore[key];
+  }
+  ageStateBefore(key) {
+    const rev = this.stateKeyChangeCountBefore[key];
+    if (!rev) return Infinity;
+    return (this.changeCount - rev) + 1;
+  }
+
+  hasState2Before(key) {
+    return Object.prototype.hasOwnProperty.call(this.state2Before, key);
+  }
+  getState2Before(key) {
+    return this.state2Before[key];
+  }
+  ageState2Before(key) {
+    const rev = this.stateKeyChangeCount2Before[key];
+    if (!rev) return Infinity;
+    return (this.changeCount - rev) + 1;
   }
 
   // Serialization
@@ -176,26 +274,36 @@ class RecauseEngine {
 }
 
 /*******************************************************************************
- * 2) ChatWizard Framework - A framework built on the Recause Metaframework
- *    - Creates and owns a RecauseEngine internally.
- *    - Provides askText, askMulti, askRadio, askCheckbox, etc. - extensible 
+ * (2) ChatWizard Framework
+ *     - Uses the Recause Framework for flow and state management
+ *     - Provides askText, askMulti, askRadio, askCheckbox, askButton, 
+ *       askButtonForced dialog widgets for super concise domain chat flows.
+ *     - Skips a prompt if an answer exists and not in edit mode or forced
+ *     - Passes access to the Recause Framework on to the domain application
+ *       so it can enforce its own rules for flow and state managemen.
  ******************************************************************************/
 class ChatWizard {
-  constructor(container, savedState = null) {
+  constructor(container, savedState, domainFlow) {
     this.container = container;
-    // We create our RecauseEngine here:
     this.recauseEngine = new RecauseEngine(savedState);
-    // Ephemeral UI state (editing flags)
+    this.domainFlow = domainFlow;
     this.editing = {};
+
+    this.frameworkApi = this.buildFrameworkAPI();
   }
 
-  reRunFlow(domainFlow) {
+  runFlow() {
     this.container.innerHTML = "";
-    const api = this.buildFrameworkAPI(domainFlow);
-    this.recauseEngine.runFlow(domainFlow, api);
+    this.recauseEngine.runFlow(({ recause }) => this.internalFlow(recause));
   }
 
-  buildFrameworkAPI(domainFlow) {
+  internalFlow(recause) {
+    this.container.innerHTML = "";
+    const flow = { ...this.frameworkApi, recause };
+    this.domainFlow(flow);
+  }
+
+  buildFrameworkAPI() {
     const self = this;
 
     return {
@@ -215,70 +323,83 @@ class ChatWizard {
         const val = self.recauseEngine.getState(key);
         const editing = !!self.editing[key];
         if (val !== undefined && !editing) {
-          self.renderReadOnly(question, val, key, domainFlow);
-        } else {
-          self.renderTextInput(question, key, val || "", domainFlow);
-          self.recauseEngine.stopHere();
+          self.renderReadOnly(question, val, key);
+          return;
         }
+        self.renderTextInput(question, key, val || "");
+        self.recauseEngine.stopHere();
       },
 
-      askMulti(question, key) {
+      askMultiText(question, key) {
         const val = self.recauseEngine.getState(key);
         const editing = !!self.editing[key];
         if (val !== undefined && !editing) {
-          self.renderReadOnly(question, val, key, domainFlow);
-        } else {
-          self.renderMultiInput(question, key, val || "", domainFlow);
-          self.recauseEngine.stopHere();
+          self.renderReadOnly(question, val, key);
+          return;
         }
+        self.renderMultiTextInput(question, key, val || "");
+        self.recauseEngine.stopHere();
       },
 
       askRadio(question, key, options) {
         const val = self.recauseEngine.getState(key);
         const editing = !!self.editing[key];
         if (val !== undefined && !editing) {
-          self.renderReadOnly(question, val, key, domainFlow);
-        } else {
-          self.renderRadioInput(question, key, val, options, domainFlow);
-          self.recauseEngine.stopHere();
+          self.renderReadOnly(question, val, key);
+          return;
         }
+        self.renderRadioInput(question, key, val, options);
+        self.recauseEngine.stopHere();
       },
 
       askCheckbox(question, key, options) {
         const val = self.recauseEngine.getState(key) || "";
         const editing = !!self.editing[key];
-        if (val !== "" && val !== undefined && !editing) {
-          self.renderReadOnly(question, val, key, domainFlow);
-        } else {
-          self.renderCheckboxInput(question, key, val, options, domainFlow);
-          self.recauseEngine.stopHere();
+        if (val && !editing) {
+          self.renderReadOnly(question, val, key);
+          return;
         }
+        self.renderCheckboxInput(question, key, val, options);
+        self.recauseEngine.stopHere();
+      },
+
+      askButton(question, key, options) {
+        const val = self.recauseEngine.getState(key);
+        const editing = !!self.editing[key];
+        if (val !== undefined && !editing) {
+          self.renderReadOnly(question, val, key);
+          return;
+        }
+        self.renderButtonInput(question, key, val, options);
+        self.recauseEngine.stopHere();
+      },
+
+      askButtonForced(question, key, options) {
+        const val = self.recauseEngine.getState(key);
+        self.renderButtonInput(question, key, val, options);
+        self.recauseEngine.stopHere();
       }
     };
   }
 
-  /*
-   * Render methods
-   */
-  renderReadOnly(question, answerVal, key, domainFlow) {
+  renderReadOnly(question, answerVal, key) {
     const block = document.createElement('div');
     block.className = 'question-block';
 
     const header = document.createElement('div');
     header.className = 'question-header';
-
     const q = document.createElement('div');
     q.className = 'question-text';
     q.textContent = question;
     header.appendChild(q);
 
-    const editBtn = document.createElement('button');    // Edit button handling
+    const editBtn = document.createElement('button');
     editBtn.className = 'edit-button';
     editBtn.textContent = "Edit";
     editBtn.onclick = () => {
       Object.keys(this.editing).forEach(k => this.editing[k] = false);
       this.editing[key] = true;
-      this.reRunFlow(domainFlow);
+      this.runFlow();
     };
     header.appendChild(editBtn);
 
@@ -292,18 +413,16 @@ class ChatWizard {
     this.container.appendChild(block);
   }
 
-  renderTextInput(question, key, existingVal, domainFlow) {
+  renderTextInput(question, key, existingVal) {
     const block = document.createElement('div');
     block.className = 'question-block';
 
     const header = document.createElement('div');
     header.className = 'question-header';
-
     const q = document.createElement('div');
     q.className = 'question-text';
     q.textContent = question;
     header.appendChild(q);
-
     block.appendChild(header);
 
     const inp = document.createElement('input');
@@ -315,11 +434,11 @@ class ChatWizard {
       const val = inp.value.trim() || undefined;
       this.recauseEngine.setState(key, val);
       this.editing[key] = false;
-      this.reRunFlow(domainFlow);
+      this.runFlow();
     };
 
     inp.addEventListener('keydown', ev => {
-      if (ev.key === "Enter") {
+      if (ev.key==="Enter") {
         ev.preventDefault();
         finalize();
       }
@@ -334,13 +453,12 @@ class ChatWizard {
     inp.focus();
   }
 
-  renderMultiInput(question, key, existingVal, domainFlow) {
+  renderMultiTextInput(question, key, existingVal) {
     const block = document.createElement('div');
     block.className = 'question-block';
 
     const header = document.createElement('div');
     header.className = 'question-header';
-
     const q = document.createElement('div');
     q.className = 'question-text';
     q.textContent = question;
@@ -358,7 +476,7 @@ class ChatWizard {
       const val = ta.value.trim() || undefined;
       this.recauseEngine.setState(key, val);
       this.editing[key] = false;
-      this.reRunFlow(domainFlow);
+      this.runFlow();
     };
     block.appendChild(btn);
 
@@ -366,18 +484,16 @@ class ChatWizard {
     ta.focus();
   }
 
-  renderRadioInput(question, key, existingVal, options, domainFlow) {
+  renderRadioInput(question, key, existingVal, options) {
     const block = document.createElement('div');
     block.className = 'question-block';
 
     const header = document.createElement('div');
     header.className = 'question-header';
-
     const q = document.createElement('div');
     q.className = 'question-text';
     q.textContent = question;
     header.appendChild(q);
-
     block.appendChild(header);
 
     let firstRadio = null;
@@ -389,12 +505,8 @@ class ChatWizard {
       r.type = 'radio';
       r.name = key;
       r.value = opt.value;
-      if (opt.value === existingVal) {
-        r.checked = true;
-      }
-      if (!firstRadio) {
-        firstRadio = r;
-      }
+      if (opt.value === existingVal) r.checked = true;
+      if (!firstRadio) firstRadio = r;
 
       const lbl = document.createElement('label');
       lbl.textContent = opt.label || opt.value;
@@ -411,31 +523,26 @@ class ChatWizard {
       const val = chosen ? chosen.value : undefined;
       this.recauseEngine.setState(key, val);
       this.editing[key] = false;
-      this.reRunFlow(domainFlow);
+      this.runFlow();
     };
     block.appendChild(btn);
 
     this.container.appendChild(block);
-    if (firstRadio) {
-      firstRadio.focus();
-    }
+    if (firstRadio) firstRadio.focus();
   }
 
-  renderCheckboxInput(question, key, existingVal, options, domainFlow) {
+  renderCheckboxInput(question, key, existingVal, options) {
     const block = document.createElement('div');
     block.className = 'question-block';
 
     const header = document.createElement('div');
     header.className = 'question-header';
-
     const q = document.createElement('div');
     q.className = 'question-text';
     q.textContent = question;
     header.appendChild(q);
-
     block.appendChild(header);
 
-    // existingVal might be "Heater, AC", so split it by commas
     const chosenValues = existingVal
       ? existingVal.split(",").map(x => x.trim()).filter(Boolean)
       : [];
@@ -448,12 +555,8 @@ class ChatWizard {
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.value = opt.value;
-      if (chosenValues.includes(opt.value)) {
-        cb.checked = true;
-      }
-      if (!firstCheck) {
-        firstCheck = cb;
-      }
+      if (chosenValues.includes(opt.value)) cb.checked = true;
+      if (!firstCheck) firstCheck = cb;
 
       const lbl = document.createElement('label');
       lbl.textContent = opt.label || opt.value;
@@ -466,93 +569,135 @@ class ChatWizard {
     const btn = document.createElement('button');
     btn.textContent = "OK";
     btn.onclick = () => {
-      const cbs = block.querySelectorAll(`input[type="checkbox"]`);
+      const cbs = block.querySelectorAll('input[type="checkbox"]');
       const arr = [];
       cbs.forEach(c => {
-        if (c.checked) {
-          arr.push(c.value);
-        }
+        if (c.checked) arr.push(c.value);
       });
-      const val = (arr.length > 0) ? arr.join(", ") : undefined;
+      const val = arr.length>0 ? arr.join(", ") : undefined;
       this.recauseEngine.setState(key, val);
       this.editing[key] = false;
-      this.reRunFlow(domainFlow);
+      this.runFlow();
     };
     block.appendChild(btn);
 
     this.container.appendChild(block);
-    if (firstCheck) {
-      firstCheck.focus();
-    }
+    if (firstCheck) firstCheck.focus();
   }
 
-  // Helper to expose final data for debugging or saving
+  renderButtonInput(question, key, existingVal, options) {
+    const block = document.createElement('div');
+    block.className = 'question-block';
+
+    const header = document.createElement('div');
+    header.className = 'question-header';
+    const q = document.createElement('div');
+    q.className = 'question-text';
+    q.textContent = question;
+    header.appendChild(q);
+    block.appendChild(header);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'button-row';
+
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.textContent = opt.label || opt.value;
+      btn.onclick = () => {
+        this.recauseEngine.setState(key, opt.value);
+        this.editing[key] = false;
+        this.runFlow();
+      };
+      btnRow.appendChild(btn);
+    });
+
+    block.appendChild(btnRow);
+    this.container.appendChild(block);
+
+    const firstBtn = btnRow.querySelector('button');
+    if (firstBtn) firstBtn.focus();
+  }
+
   serializeState() {
     return this.recauseEngine.serializeState();
   }
 }
 
 /*******************************************************************************
- * 3) Domain Flow - An application domain specific flow example.
- *    - A short example that uses all controls in a linear style.
- *    - Almost anything goes here.
- *    - Just remember to keep flow state in flow.recause
+ * (3) Business domain specific Vacation Planner Chat flow
+ *     - Demonstrates usage of the ChatWizard and Recause Frameworks
+ *     - Very concise flow programming keeping full JavaScript programming
+ *       flexibility as not reliant on a typical DSL-based programming model.
+ *     - Still potential to make things even more concise. But hard to beat.
+ *     - Note how the missing passport causes a change in the flow. Try it!
+ *     - Another Framework might offer a multi-page forms wizard instead in 
+ *       a similarly concise fashion.
  ******************************************************************************/
 
-function domainFlow(flow) {
-  flow.say("Hello! We'll ask about your houses now...two questions each.");
-  flow.askText("How many houses do you have?", "houseCount");
-  const count = parseInt(flow.recause.getState("houseCount") || "0", 10);
-  if (count > 0) {
-    for (let i = 0; i < count; i++) {
-      flow.askText(`Street of house #${i + 1}?`, `houseStreet.${i}`);
-      flow.askRadio(
-        `Which region is house #${i + 1} located in?`,
-        `houseRegion.${i}`,
+function vacationPlannerFlow(flow) {
+  flow.askText("Hi there! What's your name?", "userName");
+  flow.askRadio(
+    "Which region are you planning to travel to?",
+    "travelRegion",
+    [
+      { value: "domestic", label: "Domestic (within country)" },
+      { value: "international", label: "International" }
+    ]
+  );
+  if (flow.recause.getState("travelRegion") === "international") {
+    flow.recause.forceStateOrder("travelRegion", "hasPassport");
+    flow.askRadio(
+      "Do you have a valid passport?",
+      "hasPassport",
+      [
+        { value: "yes", label: "Yes" },
+        { value: "no",  label: "No" }
+      ]
+    );
+    if (flow.recause.getState("hasPassport") === "no") {
+      flow.recause.setState("travelRegion", "domestic");
+      flow.askButtonForced(
+        `It seems you don’t have a passport. Let’s switch to a domestic trip for now!`,
+        `okToSwitch`,
         [
-          { value: "north", label: "North" },
-          { value: "south", label: "South" },
-          { value: "east",  label: "East"  },
-          { value: "west",  label: "West"  }
-        ]
-      );
-      flow.askText(`ZIP code of house #${i + 1}?`, `houseZip.${i}`);
-      flow.askCheckbox(
-        `Which amenities does house #${i + 1} have?`,
-        `houseAmenities.${i}`,
-        [
-          { value: "Heater", label: "Heater" },
-          { value: "AC",     label: "Air Conditioning" },
-          { value: "Pool",   label: "Pool" }
+          { value: "ok", label: "OK" }
         ]
       );
     }
-  } else {
-    flow.say("No houses => skipping addresses!");
   }
-  flow.askMulti("Any final remarks or comments?", "finalRemarks");
-  flow.say("All done. Type showData() to see final data in the console!");
+  flow.askCheckbox(
+    "Which activities are you interested in?",
+    "travelActivities",
+    [
+      { value: "Skiing" },
+      { value: "Beach" },
+      { value: "City Tours" },
+      { value: "Hiking" },
+      { value: "Shopping" }
+    ]
+  );
+  flow.askMultiText("Any special requirements or details we should know about?", "extraNotes");
+  flow.say("Thanks for planning your trip with us! Call showData() to review your answers.");
 }
 
 /*******************************************************************************
- * 4) Integration
- *    - Instantiates the ChatWizard, passing in any saved state from localStorage.
- *    - Runs the domain flow on page load. Re-runs happen upon prompts.
+ * (4) Integration
  ******************************************************************************/
 document.addEventListener("DOMContentLoaded", () => {
-  const container  = document.getElementById('chat-container');
-  const savedState = localStorage.getItem("chatFlowState") || null;
-  const wizard     = new ChatWizard(container, savedState);
+  const container = document.getElementById('chat-container');
 
-  wizard.reRunFlow(domainFlow); // Kick off the domainFlow
+  // Load any saved state from localStorage if desired
+  const savedState = localStorage.getItem("chatFlowState") || null;
+
+  const wizard = new ChatWizard(container, savedState, vacationPlannerFlow);
+  wizard.runFlow();
 
   // For debugging or saving
   window.showData = () => {
     const json = wizard.serializeState();
-    console.log("Flow State:", JSON.parse(json));
+    console.log("Flow State (current):", JSON.parse(json));
     alert("Open console => see final JSON:\n\n" + json);
   };
-
   window.saveData = () => {
     localStorage.setItem("chatFlowState", wizard.serializeState());
     alert("State saved to localStorage!");
