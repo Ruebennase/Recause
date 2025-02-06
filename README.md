@@ -74,3 +74,4 @@ So I rather tend to demand lightweight exceptions from the programming language 
 Oh and "Recause" is essentially for 'cause again' and in french, when adorned with an apostrophe, it means to "talk again with someone".
 An alternative name was "Tentativity" which isn't a real word either but nicely captures that the state is tentative/counterfactual until it becomes factual, sort of.
 
+The forceStateOrder() function inspires that Recause should next be extended to support the stating of more global rules, eg causality constraints or invariants that ought to be obeyed at all times... Need to ponder this.
