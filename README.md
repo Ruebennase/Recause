@@ -48,11 +48,14 @@ Careful, highly experimental for now.
 
 ---
 
-### Example Flow
+### Example Flows
 
-A “vacation planner” example is provided:
+A “vacation planner” example:
 - Asks about travel plans and collects certain data  
 - Stores all data in Recause’s single state object
+
+A "house inventory" example:
+- Asks about number of houses and collects data for each
 
 You can **serialize** that state any time and **reload** it later—resuming exactly where you left off.
 
