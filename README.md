@@ -2,7 +2,9 @@
 
 **A minimal JavaScript meta-framework (Recause) and a chat-style UI layer (ChatWizard) for building step-by-step flows**.
 
-This approach “pauses” your flow at each prompt by throwing an exception, then re-runs the same function from the start whenever new data arrives—skipping any steps whose data is already known.
+This approach “pauses” your flow at each prompt by throwing an exception, then re-runs the same function from the start whenever new data arrives—skipping any steps whose data are already known.
+
+Careful, highly experimental for now.
 
 ---
 
@@ -14,14 +16,14 @@ This approach “pauses” your flow at each prompt by throwing an exception, th
 
 2. **Single State Object (Portable & Serializable)**  
    - All data (progress, answers, partial inputs) is stored in a single JSON-friendly object.  
-   - Easily persist or transport flows mid-execution—pick up exactly where you left off on another device or server.
+   - Easily persist or transport flows mid-execution and pick up exactly where you left off on another device or server.
 
 3. **Fully Programmable Flows**  
    - Use standard JavaScript (loops, conditionals, async calls, etc.)—no specialized DSL or rigid state machines.  
    - Can run in the browser or Node.js, making it suitable for diverse environments.
 
 4. **Beyond User Prompts**  
-   - Although showcased with a chat UI, Recause works for any **incremental data or async** scenario where a linear flow needs to pause until more info arrives.
+   - Although showcased with a chat UI, Recause works for any **incremental data or async** scenario where an arbitrary flow needs to pause until more info arrives.
 
 ---
 
@@ -42,19 +44,17 @@ This approach “pauses” your flow at each prompt by throwing an exception, th
 
 4. **Minimal & Extensible**  
    - No heavy dependencies—just DOM manipulation for a simple chat-like experience.  
-   - Swap out ChatWizard for another layer (CLI, React, Vue, etc.) if you prefer.
+   - Unclear if integration with other UI/Reactive Frameworks sensible.
 
 ---
 
 ### Example Flow
 
-A “house survey” example is provided:
-- Asks how many houses you have  
-- Collects address, region, amenities for each house  
-- Ends with final remarks  
+A “vacation planner” example is provided:
+- Asks about travel plans and collects certain data  
 - Stores all data in Recause’s single state object
 
-You can **serialize** that state any time and **reload** it later—resuming exactly where you left off!
+You can **serialize** that state any time and **reload** it later—resuming exactly where you left off.
 
 ---
 
@@ -66,4 +66,11 @@ You can **serialize** that state any time and **reload** it later—resuming exa
 
 ### Contributing
 
-Suggestions, bug reports, and pull requests are welcome! Feel free to open an issue or PR. Together, let’s make incremental flow logic simpler and more powerful.
+Suggestions or any constructive or destructive feedbacks, are welcome! I haven't seen a beast like this before but may just not know enough. Still wondering what this actually is.
+
+### Final Notes
+I'm aware that abusing exceptions like this is a performance sin and I will fry in hell for using them this way. But it's fun and seems useful upon first sight.
+So I rather tend to demand lightweight exceptions from the programming language folks for the moment (until I agree about how rotten the approach is).
+Oh and "Recause" is essentially for 'cause again' and in french, when adorned with an apostrophe, it means to "talk again with someone".
+An alternative name was "Tentativity" which isn't a real word either but nicely captures that the state is tentative/counterfactual until it becomes factual, sort of.
+
