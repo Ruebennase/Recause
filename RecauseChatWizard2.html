@@ -650,50 +650,40 @@ class ChatWizard {
  *       a similarly concise fashion.
  ******************************************************************************/
 
-function vacationPlannerFlow(flow) {
-  flow.askText("Hi there! What's your name?", "userName");
-  flow.askRadio(
-    "Which region are you planning to travel to?",
-    "travelRegion",
-    [
-      { value: "domestic", label: "Domestic (within country)" },
-      { value: "international", label: "International" }
-    ]
-  );
-  if (flow.recause.getState("travelRegion") === "international") {
-    flow.recause.forceStateOrder("travelRegion", "hasPassport");
-    flow.askRadio(
-      "Do you have a valid passport?",
-      "hasPassport",
-      [
-        { value: "yes", label: "Yes" },
-        { value: "no",  label: "No" }
-      ]
-    );
-    if (flow.recause.getState("hasPassport") === "no") {
-      flow.recause.setState("travelRegion", "domestic");
-      flow.askButtonForced(
-        `It seems you don’t have a passport. Let’s switch to a domestic trip for now!`,
-        `okToSwitch`,
+function domainFlow(flow) {
+  flow.say("Hello! We'll ask about your houses now (two questions each).");
+  flow.askText("What is your name?", "name");
+  flow.askText("How many houses do you have, "+flow.recause.getStateOrDefault("name","")+"?", "houseCount");
+  const count = parseInt(flow.recause.getState("houseCount") || "0", 10);
+  if (count > 0) {
+    for (let i = 0; i < count; i++) {
+      flow.askText(`Street of house #${i + 1}?`, `houseStreet.${i}`);
+      flow.askRadio(
+        `Which region is house #${i + 1} located in?`,
+        `houseRegion.${i}`,
         [
-          { value: "ok", label: "OK" }
+          { value: "north", label: "North" },
+          { value: "south", label: "South" },
+          { value: "east",  label: "East"  },
+          { value: "west",  label: "West"  }
+        ]
+      );
+      flow.askText(`ZIP code of house #${i + 1}?`, `houseZip.${i}`);
+      flow.askCheckbox(
+        `Which amenities does house #${i + 1} have?`,
+        `houseAmenities.${i}`,
+        [
+          { value: "Heater", label: "Heater" },
+          { value: "AC",     label: "Air Conditioning" },
+          { value: "Pool",   label: "Pool" }
         ]
       );
     }
+  } else {
+    flow.say("No houses => skipping addresses!");
   }
-  flow.askCheckbox(
-    "Which activities are you interested in?",
-    "travelActivities",
-    [
-      { value: "Skiing" },
-      { value: "Beach" },
-      { value: "City Tours" },
-      { value: "Hiking" },
-      { value: "Shopping" }
-    ]
-  );
-  flow.askMultiText("Any special requirements or details we should know about?", "extraNotes");
-  flow.say("Thanks for planning your trip with us! Call showData() to review your answers.");
+  flow.askMultiText("Any final remarks or comments?", "finalRemarks");
+  flow.say("All done. Type showData() to see final data in the console!");
 }
 
 /*******************************************************************************
@@ -705,7 +695,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Load any saved state from localStorage if desired
   const savedState = localStorage.getItem("chatFlowState") || null;
 
-  const wizard = new ChatWizard(container, savedState, vacationPlannerFlow);
+  const wizard = new ChatWizard(container, savedState, domainFlow);
   wizard.runFlow();
 
   // For debugging or saving
