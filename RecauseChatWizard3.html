@@ -741,7 +741,7 @@ class ChatWizard {
  ******************************************************************************/
 
 function domainFlow(flow) {
-  flow.say("Hello! We'll ask about your houses now (two questions each).");
+  flow.say("Hello! We'll ask about your houses now (four questions each).");
   flow.askText("What is your name?", "name");
   flow.askText("How many houses do you have, "+flow.recause.getStateOrDefault("name","")+"?", "houseCount");
   const count = parseInt(flow.recause.getState("houseCount") || "0", 10);
