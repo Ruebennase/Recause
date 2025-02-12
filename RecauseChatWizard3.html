@@ -778,7 +778,6 @@ function domainFlow(flow) {
   flow.askMultiText("Any final remarks or comments?", "finalRemarks");
   if (flow.recause.getState("okShowMe") === "yes") {
     window.showData();
-    flow.recause.removeState("okShowMe");
   }
   flow.askButtonForced(
     `We're done, shall I show you the state captured so far?`,
