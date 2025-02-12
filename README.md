@@ -50,14 +50,14 @@ Careful, highly experimental for now.
 
 ### Example Flows
 
-A “vacation planner” example (Number 1):
+A “vacation planner” example (**RecauseChatWizard**):
 - Asks about travel plans and collects certain data  
 - Stores all data in Recause’s single state object
 
-A "house inventory" example (Number 2):
+A "house inventory" example (**RecauseChatWizard2**):
 - Asks about number of houses and collects data for each
 
-A "house inventory" example (Number 3):
+A "house inventory" example (**RecauseChatWizard3**):
 - Asks about number of houses and collects data for each
 - Now keeps data in hierarchical state structure
 - Now prompts have indentation
