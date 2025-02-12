@@ -50,12 +50,19 @@ Careful, highly experimental for now.
 
 ### Example Flows
 
-A “vacation planner” example:
+A “vacation planner” example (Number 1):
 - Asks about travel plans and collects certain data  
 - Stores all data in Recause’s single state object
 
-A "house inventory" example:
+A "house inventory" example (Number 2):
 - Asks about number of houses and collects data for each
+
+A "house inventory" example (Number 3):
+- Asks about number of houses and collects data for each
+- Now keeps data in hierarchical state structure
+- Now prompts have indentation
+- Based on Recause supporting hierarchical state
+- Based on ChatWizard supporing indentation small other visual improvements
 
 You can **serialize** that state any time and **reload** it later—resuming exactly where you left off.
 
