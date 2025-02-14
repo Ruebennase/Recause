@@ -50,7 +50,9 @@ Careful, highly experimental for now.
 
 ### Example Flows
 
-If only one, then use and inspect RecauseChatWizard3 - it is the most current one.
+If only one, then use and inspect RecauseChatWizard3 - it is the most current one. 
+
+The actual domain flows - the simple dialog specs - are shown at the tails of the examples, respectively.
 
 A “vacation planner” example (**RecauseChatWizard**):
 - Asks about travel plans and collects certain data  
