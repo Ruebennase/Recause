@@ -2,7 +2,8 @@
 
 # Recause
 
-### WORK IN PROGRESS - FILES COMING SHORTLY (TODAY IS July 11 2026)
+### WORK IN PROGRESS — FILES COMING SHORTLY  
+*July 11, 2026*
 
 ### There is another way to write interactive software.
 
@@ -18,7 +19,7 @@ Re-run when new state arrives.
 
 Recause is an experimental programming model and reference implementation for **incremental, resumable interaction flows**.
 
-A Recause flow is written as ordinary JavaScript. The runtime evaluates that function against explicit state. When a derived framework reaches information that is not yet available, it presents the appropriate interaction and stops the flow. When the missing state becomes available, the same function runs again from the beginning.
+A Recause flow is written as ordinary code. The current reference implementation uses JavaScript. The runtime evaluates that function against explicit state. When a derived framework reaches information that is not yet available, it presents the appropriate interaction and stops the flow. When the missing state becomes available, the same function runs again from the beginning.
 
 Earlier operations resolve immediately from state. Execution reaches the next unsatisfied point.
 
@@ -29,7 +30,7 @@ RUN → STOP → STATE → RUN
 The result is code that often reads like the interaction itself, without splitting the domain flow across event handlers, callbacks, component lifecycles, workflow nodes, and explicit resume logic.
 
 > Recause does not preserve a suspended JavaScript call stack.  
-> Progress is represented by serializable state.
+> Progress is represented by explicit, serializable state.
 
 ## The idea in one example
 
@@ -584,13 +585,77 @@ RestartFlow  prior state changed; evaluate again from the beginning
 
 Whether exceptions are the ideal implementation mechanism in every language is an open question. The programming model matters more than the specific signal mechanism.
 
+## State can outlive a particular flow
+
+Serialized Recause state does not require the receiving runtime to use a byte-for-byte identical flow definition.
+
+The receiving flow must instead be **compatible with the portions of state it interprets**.
+
+Compatibility may include:
+
+- agreed state paths and scopes;
+- compatible value types and meanings;
+- compatible completion and revision semantics;
+- preserved domain invariants;
+- compatible handling of recorded effects;
+- an understood flow or schema version.
+
+A compatible flow may read only a subset of the state, add an independent branch, derive additional values, migrate older state, surgically update selected values, invalidate downstream state, present the same state through another interaction framework, or run in another language.
+
+For example:
+
+```text
+/application/...       written by the applicant flow
+/validation/...        written by a validation flow
+/review/...            written by the reviewer flow
+```
+
+The reviewer flow may read the application branch without modifying it. A correction flow may be authorized to change selected application values and invalidate dependent review state.
+
+State exchange in Recause is therefore closer to exchanging a **versioned domain document** than transferring a suspended call stack.
+
+This opens a broader possibility:
+
+```text
+one shared state
+multiple compatible flows
+different owners
+different interfaces
+different languages
+```
+
+Recause is not only about resuming one interaction. It may also support **causing compatible computations around shared, versioned state**.
+
+### Possible compatibility levels
+
+```text
+Read-compatible
+The flow understands and may read selected state.
+
+Extension-compatible
+The flow may add state without changing existing meanings.
+
+Mutation-compatible
+The flow may change specified existing paths while preserving invariants.
+
+Resume-compatible
+The flow can continue the original interaction toward an equivalent
+completion condition.
+
+Migration-compatible
+The flow can transform state from one declared version to another.
+```
+
+A future Recause specification may formalize these levels.
+
 ## Portability
 
-A flow can move between engine instances when:
+A Recause computation can move between runtime instances when:
 
 1. all relevant progress is represented in serializable state;
-2. the receiving runtime has the same compatible flow definition;
-3. external effects and resources are handled explicitly.
+2. the receiving runtime has a compatible flow;
+3. the receiving runtime understands the relevant state semantics;
+4. external effects and resources are handled explicitly.
 
 Conceptually:
 
@@ -598,12 +663,229 @@ Conceptually:
 browser
   → serialize state
   → store or transmit
-  → create another engine
+  → create another runtime
   → load state
-  → run the same flow
+  → run a compatible flow
 ```
 
+The compatible flow may be another version of the same interaction, a reviewer, validator, migration, terminal flow, or a flow written in another language.
+
 The current implementation demonstrates the state side of this model. Production-grade distributed execution would require versioning, migration, effect guarantees, authorization, and durable storage around it.
+
+## Potential crystallisation points
+
+The Recause model does not prescribe one language-level control mechanism. Different implementations may crystallise around different constructs.
+
+### 1. Exceptions
+
+A missing value raises a dedicated control signal. The outer runtime catches it, retains explicit state, and waits for another cause of execution.
+
+This is the mechanism used by the JavaScript reference implementation and is a natural first path for Python, Java, Kotlin, C#, Ruby, PHP, Swift, and similar languages.
+
+### 2. Explicit control-flow results
+
+Each operation returns either a value or an indication that execution must stop.
+
+```text
+Value<T>
+Missing<Request>
+Restart
+Failure<Error>
+```
+
+This avoids using exceptions for expected control flow, but requires the stop result to propagate through intervening functions.
+
+### 3. Algebraic effects and handlers
+
+A request for missing state may be represented as an effect. A Recause handler can interpret that effect as a state lookup, interaction, or suspension.
+
+### 4. Delimited continuations
+
+A runtime may capture a bounded continuation at the point where state is missing. This creates a resumable variant of Recause, distinct from the reference model's deliberate re-evaluation from the flow entry point.
+
+### 5. Generators and coroutines
+
+A flow may yield requests and receive values in return. This can provide convenient syntax, but retained generator state is normally not directly serializable.
+
+### 6. Interpreters and embedded DSLs
+
+A Recause flow may be represented as data and interpreted by a runtime. This improves inspection and migration, but gives up some of the attraction of unrestricted ordinary code.
+
+### 7. Replay-oriented runtimes
+
+A runtime may record decisions or state changes and deterministically replay the program, provided effects and non-determinism are controlled.
+
+### 8. Conditions and restarts
+
+Languages with resumable condition systems may treat missing state as a condition and expose ways to satisfy or defer it.
+
+> Recause is not “a clever use of exceptions.” Exceptions are one possible crystallisation point for the model.
+
+## Languages likely to support the model
+
+The minimum requirements are modest:
+
+1. A flow can be evaluated from its beginning.
+2. Progress can be stored outside the local call stack.
+3. A missing value can stop the current evaluation.
+4. The runtime can distinguish an intentional stop from a real failure.
+5. The flow can later be evaluated again against changed state.
+
+| Language family | Likely mechanism | Initial suitability |
+|---|---|---|
+| JavaScript / TypeScript | Exceptions | Excellent |
+| Python | Exceptions | Excellent |
+| Ruby | Exceptions or `throw` / `catch` | Excellent |
+| Java / Kotlin | Exceptions | Very good |
+| C# / F# | Exceptions or typed results | Very good |
+| PHP | Exceptions | Good |
+| Swift | Throwing functions or result values | Good |
+| Go | Explicit result propagation | Possible, more explicit |
+| Rust | `Result`, `?`, control-flow enum | Possible, strongly typed |
+| OCaml | Exceptions or effect handlers | Especially interesting |
+| Racket / Scheme | Exceptions or continuations | Especially interesting |
+| Common Lisp | Conditions and restarts | Especially interesting |
+| Haskell | Effect, state, or continuation abstractions | Powerful, less ordinary-looking |
+| C | Return codes or non-local jump facilities | Technically possible |
+
+One of the interesting questions around Recause is how much of the model remains stable while the language-level crystallisation point changes.
+
+## A Python implementation and CLI framework
+
+A Python implementation is a natural second reference implementation. It would show that Recause is not fundamentally a browser library or JavaScript-specific, and that a wizard is an interpretation of missing state rather than a particular visual component.
+
+```python
+def onboarding(cli):
+    cli.say("Welcome.")
+
+    cli.ask_text("What is your name?", "name")
+
+    cli.ask_choice(
+        "What are you building?",
+        "project_type",
+        ["library", "application", "experiment"],
+    )
+
+    name = cli.get_value("name")
+    project_type = cli.get_value("project_type")
+
+    cli.say(f"Hello {name}. Let us build your {project_type}.")
+```
+
+A terminal framework could eventually support text, passwords, confirmations, choices, numbers, dates, file paths, editor input, review, back, undo, save-and-exit, and resume.
+
+Possible uses include project scaffolding, deployment configuration, installation assistants, administrative workflows, guided diagnostics, data-cleaning tools, migrations, and AI-assisted terminal applications.
+
+The Python runtime and CLI framework are planned experiments, not yet part of the current JavaScript implementation.
+
+## Related work
+
+Recause sits near several established programming ideas, but does not identify completely with any one of them.
+
+### Exceptions and non-local control transfer
+
+The current JavaScript implementation uses exceptions as lightweight control signals. The exception does not preserve the interrupted stack; the flow is later evaluated again against updated state.
+
+### Replay and durable execution
+
+Durable execution systems also reconstruct progress from persisted information. Recause shares the idea that execution can be recreated from explicit state, but focuses on interactive programming and derived interaction frameworks rather than providing a distributed workflow service.
+
+### Continuations and effect handlers
+
+Continuations, delimited continuations, algebraic effects, and effect handlers may offer alternative implementation strategies. Recause itself does not require a captured continuation.
+
+### State machines and workflow graphs
+
+State machines explicitly represent states and transitions. Recause explores a complementary formulation in which ordinary procedural logic is evaluated against current facts.
+
+### Generators, coroutines, and async functions
+
+Generators and coroutines retain local execution state. A Recause flow normally discards local execution state while preserving relevant progress in explicit serializable application state.
+
+### Incremental and reactive computation
+
+Incremental and reactive systems re-evaluate computations when inputs change. Recause focuses particularly on flows that stop because information is missing and on frameworks that turn that absence into interaction.
+
+## Recause ecosystem
+
+Recause is intended to become more than one JavaScript implementation.
+
+Projects may implement the execution model in another language, build a derived interaction framework, provide tooling, define compatibility conventions, or explore a new application domain.
+
+### Implementations
+
+| Project | Language | Status | Description |
+|---|---|---:|---|
+| `recause-js` | JavaScript | Experimental | Current reference implementation |
+| `recause-py` | Python | Planned | Python implementation of the core model |
+
+### Interaction frameworks
+
+| Project | Runtime | Status | Description |
+|---|---|---:|---|
+| `recause-js-dom` | `recause-js` | Experimental | Forms, chats, pages, and async browser interaction |
+| `recause-py-cli` | `recause-py` | Planned | Interactive terminal flows |
+
+The names above describe a possible canonical project family. Repository and package boundaries may still change as the model stabilizes.
+
+### Experiments and production use
+
+Experiments test the model without claiming production readiness. A future production section may separately list projects that report using Recause or a compatible implementation in deployed systems. Listing would not imply certification or endorsement.
+
+### Add a project
+
+Open an issue or pull request containing:
+
+- the project URL;
+- the Recause implementation or idea it uses;
+- its language and runtime;
+- whether it is experimental or used in production;
+- a one-sentence description.
+
+Projects do not need to depend on the JavaScript reference implementation. Independent implementations of the Recause programming model are welcome.
+
+## Possible repository family
+
+```text
+recause
+recause-js
+recause-js-dom
+recause-py
+recause-py-cli
+```
+
+Conceptually:
+
+```text
+recause
+  model, terminology, compatibility, ecosystem, specification
+
+recause-js
+  JavaScript runtime and state model
+
+recause-js-dom
+  browser interaction frameworks
+
+recause-py
+  Python runtime and state model
+
+recause-py-cli
+  terminal interaction framework
+```
+
+Potential package names:
+
+```text
+npm
+  @recause/core
+  @recause/dom
+
+PyPI
+  recause
+  recause-cli
+```
+
+These names are proposals until actually published and should not be assumed to be reserved.
 
 ## AI and Recause
 
@@ -654,11 +936,13 @@ It has not yet established:
 - a stable public API;
 - a formal effect system;
 - state-schema migrations;
+- a formal compatibility specification;
 - durable distributed execution guarantees;
 - a renderer-independent semantic interaction tree;
 - complete accessibility and internationalization abstractions;
 - production security hardening;
-- comprehensive tests across environments.
+- comprehensive tests across environments;
+- cross-language conformance tests.
 
 Use it to explore the model, build experiments, and challenge its assumptions.
 
@@ -669,6 +953,7 @@ Do not yet depend on it for production-critical processes.
 The project may evolve in several directions:
 
 - formalizing the engine semantics;
+- defining compatibility levels;
 - extracting semantic interaction from direct DOM rendering;
 - typed state and field contracts;
 - richer validation and computed values;
@@ -677,6 +962,9 @@ The project may evolve in several directions:
 - visual state and execution inspection;
 - additional derived frameworks;
 - AI-assisted structural authoring of flows;
+- a Python reference implementation;
+- a terminal interaction framework;
+- cross-language conformance fixtures;
 - implementations in other programming languages.
 
 The priority is to understand and refine the programming model before turning it into a large widget library.
@@ -710,6 +998,9 @@ The most valuable contributions at this stage are:
 - tests that clarify intended semantics;
 - derived-framework experiments;
 - proposals for side-effect handling;
+- proposals for state compatibility;
+- independent implementations;
+- cross-language experiments;
 - documentation corrections;
 - constructive or destructive feedback backed by examples.
 
@@ -732,5 +1023,8 @@ It is a concrete proposal:
 > Perhaps an interaction can be written as one ordinary flow,  
 > and perhaps missing information can be treated as a normal reason for that flow to stop and be caused again.
 
-If that way of thinking resonates with you, feedback is welcome.
+Beyond that lies a broader possibility:
 
+> Explicit state may allow several compatible flows, frameworks, runtimes, and languages to cause useful computations around the same evolving domain document.
+
+If that way of thinking resonates with you, feedback is welcome.
