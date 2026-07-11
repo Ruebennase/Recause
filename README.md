@@ -38,6 +38,14 @@ RUN → STOP → STATE → RUN
 
 The result is code that often reads like the interaction itself, without splitting the domain flow across event handlers, callbacks, component lifecycles, workflow nodes, and explicit resume logic.
 
+## Project status
+
+Recause is an experimental programming model and reference implementation published under the MIT License.
+
+The repository exists primarily to document the model, provide a working implementation, and encourage discussion and independent experimentation. Development is currently maintainer-driven, and the time available for answering questions, reviewing issues, or evaluating contributions is limited.
+
+I do participate in GitHub Discussions, but responses and follow-up cannot be guaranteed. If the ideas are useful to you, please feel free to fork the project, build on it, and share what you learn. Independent implementations, experiments, articles, and comparisons are especially welcome.
+
 > Recause does not preserve a suspended JavaScript call stack.  
 > Progress is represented by explicit, serializable state.
 
@@ -1000,22 +1008,18 @@ FLOW → STOP → STATE → RE-ENTRY
 
 ## Contributing
 
-The most valuable contributions at this stage are:
+Recause is currently maintained as a research and reference project.
 
-- critical examples where the model becomes awkward;
-- comparisons with related programming models;
-- tests that clarify intended semantics;
-- derived-framework experiments;
-- proposals for side-effect handling;
-- proposals for state compatibility;
-- independent implementations;
-- cross-language experiments;
-- documentation corrections;
-- constructive or destructive feedback backed by examples.
+GitHub Discussions are the preferred place for questions, ideas, comparisons, examples, and technical discussion. While I do participate in discussions, my available time is limited and I cannot guarantee responses or follow-up.
 
-If Recause resembles an existing approach or body of research, references are especially welcome.
+At this stage:
 
-Open an issue with a minimal flow whenever possible.
+- GitHub Discussions are the preferred place for community discussion.
+- Pull requests are generally not reviewed or merged.
+- Issues are reserved for repository maintenance rather than general discussion or support.
+- Independent forks, experiments, implementations, articles, and comparisons are warmly encouraged.
+
+The goal of publishing Recause as open source is to make the ideas easy to study, critique, adapt, and build upon. If you find the model interesting, I would be delighted to see independent experiments and hear about your experiences.
 
 ## License
 
@@ -1036,5 +1040,4 @@ Beyond that lies a broader possibility:
 
 > Explicit state may allow several compatible flows, frameworks, runtimes, and languages to cause useful computations around the same evolving domain document.
 
-If that way of thinking resonates with you, feedback is welcome.
-
+If that way of thinking resonates with you, I hope it proves useful—and I would be delighted to see where others take the idea.
