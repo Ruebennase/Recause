@@ -146,7 +146,7 @@ That state can include:
 - interaction-specific metadata;
 - optional history.
 
-Because progress is explicit, a flow can be serialized while incomplete and reconstructed later.
+Because progress is explicit, a flow can be serialized while incomplete and reconstructed later and elsewhere.
 
 ```js
 const serialized = wizard.recauseEngine.getStateAsJSON();
@@ -166,13 +166,13 @@ const restoredWizard = new ChatWizard(
 restoredWizard.runFlow();
 ```
 
-The state is not literally an instruction pointer. It plays a similar role by allowing already-satisfied operations to resolve and guiding execution toward the next missing fact.
+Recause state includes the information necessary to reconstruct the computation’s effective program counter. It does not preserve a suspended call stack; instead, re-evaluation against full serializable state makes the same continuation point reachable again. The state allows already-satisfied operations to resolve and guides execution toward the next missing information.
 
 ## Recause is a metaframework
 
 The engine is unlikely to be the API most applications use directly.
 
-Its purpose is to support **derived frameworks** that interpret missing state in domain-specific ways.
+Its purpose is to support **derived frameworks** that interpret missing state in specific ways closer to the intended domain.
 
 The repository currently demonstrates several such interaction frameworks:
 
@@ -195,7 +195,7 @@ Recause provides the shared execution and state model underneath.
 
 ## Composition
 
-The interaction styles are not separate applications. They can be nested while operating on one scoped state tree.
+The interaction styles need not be separate applications. They can be nested while operating on one scoped state tree.
 
 ```js
 function groupTripFlow(pages) {
@@ -359,7 +359,7 @@ flow.ageValue("path.to.value");
 flow.forceValueOrder("older.path", "newer.path");
 ```
 
-These allow a flow or derived framework to reason about which facts are newer and invalidate dependent state when earlier facts change.
+These allow a flow or derived framework to reason about which data are newer and invalidate dependent state when earlier data change.
 
 This is useful when a later answer is only valid under an earlier choice.
 
@@ -409,7 +409,7 @@ The engine and several classes also expose CommonJS exports, but the current UI 
 
 ## Repository map
 
-The exact organization may evolve, but the central pieces are:
+The exact organization will evolve, but the central pieces are for now:
 
 ```text
 recauseEngine.js   state, scoping, history, StopFlow, RestartFlow
@@ -516,7 +516,7 @@ askChat(...)
 embedChat(...)
 ```
 
-The API is experimental. Names and signatures may change.
+The API is experimental. Names and signatures will change.
 
 ## What Recause is — and is not
 
@@ -533,7 +533,7 @@ Recause is not:
 - React or a virtual DOM;
 - a component framework;
 - a form schema;
-- BPMN;
+- a BPMN engine;
 - a finite-state-machine editor;
 - a durable workflow service;
 - an AI agent framework;
@@ -557,7 +557,7 @@ NAME_AND_GOAL_KNOWN
 
 the flow simply asks for `name`, then asks for `goal`.
 
-The accumulated facts make different portions of the function reachable.
+The accumulated state makes different portions of the function reachable.
 
 This can be dramatically more concise for interactions that are naturally described as procedural domain logic, especially when they contain:
 
@@ -796,7 +796,7 @@ Continuations, delimited continuations, algebraic effects, and effect handlers m
 
 ### State machines and workflow graphs
 
-State machines explicitly represent states and transitions. Recause explores a complementary formulation in which ordinary procedural logic is evaluated against current facts.
+State machines explicitly represent states and transitions. Recause explores a complementary formulation in which ordinary procedural logic is evaluated against the current data.
 
 ### Generators, coroutines, and async functions
 
@@ -895,7 +895,7 @@ Its deterministic state-and-flow model may, however, be useful for placing AI **
 
 For example:
 
-- a normal form collects established facts;
+- a normal form collects established information;
 - a guided chat helps with one ambiguous legal question;
 - an AI proposes a classification;
 - the user confirms it;
@@ -973,7 +973,7 @@ The priority is to understand and refine the programming model before turning it
 
 New state **re-causes** execution.
 
-The flow is not resumed by restoring its old stack. It is caused to run again under changed facts.
+The flow is not resumed by restoring its old stack. It is caused to run again under changed state data.
 
 There is also a pleasing secondary association with the French *recauser*: to talk together again.
 
