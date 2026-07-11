@@ -1,111 +1,736 @@
-# Recause and sample UI Wizards
+<div align="center">
 
-**A minimalist JavaScript meta-framework (Recause) as basis for any frameworks following a new programming model, plus three sample, composable UI frameworks using it for building applications with UI wizards**.
+# Recause
 
-The **Recause meta-framework** can be ported easily to other languages, this here is implemented in JavaScript. We call it meta-framework as it is more sensibly used as foundation of other frameworks rather than directly. Recause is super-minimalistic at less than 300 lines of code. Given its simplicity I suggest to copy, understand, own, and evolve it yourself - which consequently doesn't lock you and your team into anything exterior.
+### WORK IN PROGRESS - FILES COMING SHORTLY (TODAY IS July 11 2026)
 
-The **PageWizard, FormWizard, ChatWizard example frameworks** resting on Recause are already rather useful as they offer an incredibly concise and simple approach to building multi-page wizards that flexibly mix input forms and chat sequences including nestings of one inside the other (forms containing chats, chats containing forms). At less than 1200 lines of code these can form a starting point for your own more elaborate UI framework(s), so feel free to copy, understand, own, and evolve as you please, again without any strings attached.
+### There is another way to write interactive software.
 
-The/any **application** written with the aid of Recause-enabled frameworks invariably consists of a single flow. In JavaScript that flow is a single, arbitrarliy complicated function, for example. At runtime, each flow instance has its current flow state: a hierarchical data structure that is updated as the flow progresses. The only way a flow may modify its own flow state is by calling functions of the Recause-enabled frameworks. These framework functions behave differently depending on the availability of certain flow state data: when input data for the flow state is missing and cannot be obtained then the functions suspend the flow and optionally trigger actions that e.g help acquire the missing data; when the desired input data for the flow state is present then the same function will keep the flow running and optionally trigger other actions. Unless deemed finished a suspended flow needs to be restarted from the outside - often by asynchronous completions.
+Write a normal flow.  
+Stop when information is missing.  
+Re-run when new state arrives.
 
-The **Recause programming model** “suspends” your flow when data is missing from the flow state by throwing an exception that the application need not catch. It then re-runs the same flow again from the start, typically whenever new data arrives—passing the steps whose input data are already known. The flow state essentially serves the role of a structured "program counter" as it guides where the suspended flow continues. This programming model allows to easily program any application or process flows in the chosen programming language - here JavaScript - in a very intuitive, almost declarative-looking way but offering almost all the bells and whistles that your programming language offers. Compared to usually heavyweight yet limited DSLs the simplicity gained is amazing. The downside of the approach is that some seemingly straightforward solutions may be misleading. Find out if this is something for you! 
+[Website](https://recause.org) · [Live demonstration](https://recause.org/#demo)
 
-Careful, highly experimental for now. And be aware that the approach taken can twist your brain a little at times.
-
----
-
-## Recause (Meta-Framework)
-
-1. **Exception-Based “Wait & Resume”**  
-   - Write a single function describing your entire flow.  
-   - When new data is needed, Recause throws an exception to halt, then re-runs the flow e.g. once that data is available.
-
-2. **Single State Object (Portable & Serializable)**  
-   - All data (progress, answers, partial inputs) is stored in a single JSON-friendly object.  
-   - Easily persist or transport flows mid-execution and pick up exactly where you left off on another device or server.
-
-3. **Fully Programmable Flows**  
-   - Use standard JavaScript (loops, conditionals, async calls, etc.)—no specialized DSL or rigid state machines.  
-   - Can run in the browser or Node.js, making it suitable for diverse environments.
-
-4. **Beyond User Prompts**  
-   - Although showcased with a chat UI, Recause works for any **incremental data or async** scenario where an arbitrary flow needs to pause until more info arrives.
+</div>
 
 ---
 
-## ChatWizard (UI Framework on Recause)
+Recause is an experimental programming model and reference implementation for **incremental, resumable interaction flows**.
 
-1. **Chat-Style Interface**  
-   - Provides straightforward methods like `askText`, `askRadio`, `askCheckbox`, etc.  
-   - Displays previously given answers in read-only mode until edited, automatically skipping those steps on re-run.
+A Recause flow is written as ordinary JavaScript. The runtime evaluates that function against explicit state. When a derived framework reaches information that is not yet available, it presents the appropriate interaction and stops the flow. When the missing state becomes available, the same function runs again from the beginning.
 
-2. **Automatic Flow Replay**  
-   - Hooks into Recause’s mechanism to re-run your flow whenever new input is submitted.  
-   - Skips already answered questions, unless the user chooses to edit them.
+Earlier operations resolve immediately from state. Execution reaches the next unsatisfied point.
 
-3. **Clean Separation of Concerns**  
-   - ChatWizard handles UI rendering and flow invocation.  
-   - Recause manages the flow logic and state storage.  
-   - Your domain flow remains plain JavaScript.
+```text
+RUN → STOP → STATE → RUN
+```
 
-4. **Minimal & Extensible**  
-   - No heavy dependencies—just DOM manipulation for a simple chat-like experience.  
-   - Unclear if integration with other UI/Reactive Frameworks sensible.
+The result is code that often reads like the interaction itself, without splitting the domain flow across event handlers, callbacks, component lifecycles, workflow nodes, and explicit resume logic.
 
----
+> Recause does not preserve a suspended JavaScript call stack.  
+> Progress is represented by serializable state.
 
-### Example Flows
+## The idea in one example
 
-If only one, then use and inspect RecauseChatWizard3 - it is the most current one. 
+A small chat-style flow can be written as one function:
 
-The actual domain flows - the simple dialog specs - are shown at the tails of the examples, respectively.
+```js
+function registrationFlow(chat) {
+  chat.say("Welcome.");
 
-A “vacation planner” example (**RecauseChatWizard**):
-- Asks about travel plans and collects certain data  
-- Stores all data in Recause’s single state object
+  chat.askText("What should we call you?", "name");
 
-A "house inventory" example (**RecauseChatWizard2**):
-- Asks about number of houses and collects data for each
+  chat.askRadio("What are you building?", "goal", [
+    { value: "form", label: "A form" },
+    { value: "chat", label: "A guided chat" },
+    { value: "flow", label: "A larger interaction flow" }
+  ]);
 
-A "house inventory" example (**RecauseChatWizard3**):
-- Asks about number of houses and collects data for each
-- Now keeps data in hierarchical state structure
-- Now prompts have indentation
-- Based on Recause supporting hierarchical state
-- Based on ChatWizard supporing indentation small other visual improvements
+  const name = chat.getValue("name");
+  const goal = chat.getValue("goal");
 
-You can **serialize** that state any time and **reload** it later—resuming exactly where you left off.
+  chat.say(`Hello ${name}. Let us shape your ${goal}.`);
+}
+```
 
----
+Run it with a `ChatWizard`:
 
-### What exactly happens at runtime
+```js
+const container = document.getElementById("app");
 
-Let's have a look at examples of flow executions and how they look on the call stack. It is instructive to compare this with the actual code.
+const wizard = new ChatWizard(
+  container,
+  null,
+  registrationFlow
+);
 
-1. Single-level Framework usage
+wizard.runFlow();
+```
 
-The main() or some other application function calls a framework function and passes it the application's flow function. The framework calls the Recause framework. The Recause framework calls the application flow function, the application flow function calls a framework function. When the framework function has the desired state it does its thing and simply returns to the application flow function so it can continue along. But when the framework function seeks currently unavailable yet needed flow state data then it does its thing to potentially asynchronously trigger the acquisition of the missing data and then throws an exception. The application flow does not - must not - catch the particular exception, but the Recause framework does. The Recause framework determines that there is no use of the flow re-running now and returns to the original framework function. The framework function returns to the original application function, which might end processing until an asynchronous completion function is called again that ......updates the flow state and restarts the flow again. ...
+On the first run, `name` is missing:
 
-2. Triple-level Framework usage
+```text
+registrationFlow()
+  say("Welcome.")                 ✓
+  askText("...", "name")          STOP
+```
 
-Here we stack three frameworks: The initial flow defines a conditional page sequence, within a page we show a chat flow, as one of the chat fields we show a little form with a few form fields. Now let's see how this all adds up when the form fields are in focus field in the form 
+The user answers. The value is written to state. The same function runs again:
 
----
+```text
+registrationFlow()
+  say("Welcome.")                 ✓
+  askText("...", "name")          ✓  resolved from state
+  askRadio("...", "goal")         STOP
+```
 
-### License
+After the second answer, the flow runs again and reaches its end:
 
-[MIT](LICENSE)
+```text
+registrationFlow()
+  say("Welcome.")                 ✓
+  askText("...", "name")          ✓
+  askRadio("...", "goal")         ✓
+  say("Hello …")                  ✓
+```
 
----
+No continuation object is authored. No transition table says where to resume. The accumulated state causes more of the same program to become executable.
 
-### Contributing
+## What Recause actually does
 
-Suggestions or any constructive or destructive feedbacks, are welcome! I haven't seen a beast like this before but may just not know enough. Still wondering what this actually is.
+At the engine level, the model is deliberately small:
 
-### Final Notes
+1. Evaluate a flow function.
+2. Let the flow read explicit state.
+3. Stop when required state is missing.
+4. Acquire or produce that state.
+5. Evaluate the flow again.
+6. Continue until the flow completes.
 
-I'm aware that abusing exceptions like this is a performance sin and I will fry in hell for using them this way. But it's fun and seems useful upon first sight. Moreover, my old Mac can do 200'000 JavaScript exceptions per second. So while perhaps a problem in the backend there is less of a problem on the frontend.
-So I rather tend to demand lightweight exceptions from the programming language folks for the moment (until I agree about how rotten the approach is).
-Oh and "Recause" is essentially for 'cause again' and in French, when adorned with an accent, it means to "talk again with someone".
-An alternative name was "Tentativity" which isn't a real word either but nicely captures that the state is tentative/counterfactual until it becomes factual, sort of.
+In the reference implementation, intentional suspension and re-entry are represented by two control signals:
+
+```js
+throw new StopFlow();
+throw new RestartFlow();
+```
+
+These are expected runtime control signals, not application failures.
+
+The application flow normally does not catch them. The Recause engine does.
+
+```mermaid
+flowchart LR
+    A[Run flow from line 1] --> B{Required state present?}
+    B -- yes --> C[Continue]
+    C --> B
+    B -- no --> D[Derived framework creates interaction]
+    D --> E[StopFlow]
+    E --> F[New state arrives]
+    F --> A
+    C --> G[Flow completes]
+```
+
+## State is the continuation
+
+Recause keeps relevant progress in one hierarchical, JSON-friendly state structure.
+
+That state can include:
+
+- answers;
+- page position;
+- nested collection items;
+- completion markers;
+- data returned by asynchronous work;
+- interaction-specific metadata;
+- optional history.
+
+Because progress is explicit, a flow can be serialized while incomplete and reconstructed later.
+
+```js
+const serialized = wizard.recauseEngine.getStateAsJSON();
+```
+
+A new engine can be created from restored state and the same flow definition:
+
+```js
+const restoredState = JSON.parse(serialized);
+
+const restoredWizard = new ChatWizard(
+  document.getElementById("app"),
+  restoredState,
+  registrationFlow
+);
+
+restoredWizard.runFlow();
+```
+
+The state is not literally an instruction pointer. It plays a similar role by allowing already-satisfied operations to resolve and guiding execution toward the next missing fact.
+
+## Recause is a metaframework
+
+The engine is unlikely to be the API most applications use directly.
+
+Its purpose is to support **derived frameworks** that interpret missing state in domain-specific ways.
+
+The repository currently demonstrates several such interaction frameworks:
+
+| Framework | Interpretation of missing state |
+|---|---|
+| `FormWizard` | Render a form field or form section |
+| `ChatWizard` | Ask the next question conversationally |
+| `PagesWizard` | Organize nested flows into navigable pages |
+| `AsyncWizard` | Wait for data or work to complete |
+
+A derived framework decides:
+
+- how a request for state is expressed;
+- how the interaction is rendered or performed;
+- whether it blocks the parent flow;
+- where the answer is stored;
+- when the flow should run again.
+
+Recause provides the shared execution and state model underneath.
+
+## Composition
+
+The interaction styles are not separate applications. They can be nested while operating on one scoped state tree.
+
+```js
+function groupTripFlow(pages) {
+  const travelerIds =
+    pages.getValue("/onboarding.travelers") || [];
+
+  pages.beginPage("01 / Group");
+
+  pages.askForm("onboarding", form => {
+    form.askText("Destination", "destination", {
+      required: true,
+      errorMsg: "A destination is required"
+    });
+
+    form.askList("Travelers", "travelers", item => {
+      item.askText("Traveler name", "name", {
+        required: true
+      });
+    });
+
+    form.chat("packingHelp", "assistant", false, chat => {
+      chat.say("I can help with difficult packing decisions.");
+
+      chat.askButton("Would you like assistance?", "enabled", [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" }
+      ]);
+
+      if (chat.getValue("enabled") === "yes") {
+        chat.askText("What kind of trip is this?", "tripStyle");
+      }
+    });
+
+    form.submitButton("Continue", "complete");
+  });
+
+  pages.endPage();
+
+  pages.beginPage("02 / Review");
+
+  pages.say(
+    `Destination: **${
+      pages.getValue("/onboarding.destination") || "—"
+    }**`
+  );
+
+  pages.endPage();
+}
+```
+
+Here:
+
+- `PagesWizard` controls the outer navigation;
+- a `FormWizard` collects related values;
+- a `ChatWizard` is embedded only where guided interaction helps;
+- each nested framework receives a scoped view of the same state;
+- the concrete domain flow remains ordinary JavaScript.
+
+This is the main reason Recause is described as a metaframework rather than a form library.
+
+## Scoped state
+
+Nested frameworks use relative paths.
+
+Inside the `onboarding` form:
+
+```js
+form.askText("Destination", "destination");
+```
+
+stores a value below that form's scope.
+
+From the outer page flow, the same value can be addressed absolutely:
+
+```js
+pages.getValue("/onboarding.destination");
+```
+
+A leading `/` addresses the root. Relative paths stay within the current scope.
+
+This lets reusable interaction frameworks operate without knowing where they are mounted in the larger application.
+
+## Re-evaluation, not continuation capture
+
+Recause does **not**:
+
+- retain the original JavaScript stack;
+- transform the flow into a generator;
+- compile the function into a state machine;
+- persist closures;
+- jump back into the middle of a suspended function.
+
+Instead, it relies on re-evaluation.
+
+That has an important consequence:
+
+> A flow may execute many times.
+
+Flow code should therefore be treated as a projection of current state. Pure calculations are naturally safe. External side effects require explicit care.
+
+Good:
+
+```js
+const total = items.reduce(
+  (sum, item) => sum + item.cost,
+  0
+);
+```
+
+Dangerous:
+
+```js
+sendInvoice(); // could run again on every re-evaluation
+```
+
+External effects should be guarded by explicit state, idempotency keys, or a dedicated effect abstraction:
+
+```js
+if (!flow.getValue("invoice.sent")) {
+  // perform an idempotent effect
+  // then record its confirmed result
+}
+```
+
+The current project is a reference implementation. A more formal effect model is an important future direction.
+
+## History, undo, and redo
+
+A root engine can record state history:
+
+```js
+const wizard = new PagesWizard(
+  container,
+  null,
+  applicationFlow,
+  null,
+  { recordHistory: true }
+);
+```
+
+The engine exposes:
+
+```js
+wizard.recauseEngine.canUndo();
+wizard.recauseEngine.canRedo();
+wizard.recauseEngine.undo();
+wizard.recauseEngine.redo();
+```
+
+After restoring a previous state, the flow is evaluated again and the appropriate interaction is derived from that state.
+
+Undo is therefore not implemented separately by every control.
+
+## Revision-aware state
+
+State nodes carry revision information. The engine exposes helpers including:
+
+```js
+flow.revisionValue("path.to.value");
+flow.ageValue("path.to.value");
+flow.forceValueOrder("older.path", "newer.path");
+```
+
+These allow a flow or derived framework to reason about which facts are newer and invalidate dependent state when earlier facts change.
+
+This is useful when a later answer is only valid under an earlier choice.
+
+## Quick start
+
+The current reference implementation is plain JavaScript and can be loaded directly in a browser.
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Recause example</title>
+</head>
+<body>
+  <main id="app"></main>
+
+  <script src="recauseEngine.js"></script>
+  <script src="asyncWizard.js"></script>
+  <script src="baseWizard.js"></script>
+  <script src="formWizard.js"></script>
+  <script src="chatWizard.js"></script>
+  <script src="pagesWizard.js"></script>
+
+  <script>
+    function flow(chat) {
+      chat.say("Hello.");
+      chat.askText("Your name?", "name");
+      chat.say(`Welcome, ${chat.getValue("name")}.`);
+    }
+
+    const wizard = new ChatWizard(
+      document.getElementById("app"),
+      null,
+      flow
+    );
+
+    wizard.runFlow();
+  </script>
+</body>
+</html>
+```
+
+The sample UI frameworks render directly to the DOM, so their stylesheet must also be included when using the repository's supplied presentation.
+
+The engine and several classes also expose CommonJS exports, but the current UI framework implementations are browser-oriented.
+
+## Repository map
+
+The exact organization may evolve, but the central pieces are:
+
+```text
+recauseEngine.js   state, scoping, history, StopFlow, RestartFlow
+baseWizard.js      shared runtime and nesting behavior for UI frameworks
+formWizard.js      form-style interaction framework
+chatWizard.js      sequential conversational interaction framework
+pagesWizard.js     navigable page composition
+asyncWizard.js     asynchronous data interaction
+premiumDemo.html   composed multi-page demonstration
+```
+
+## Selected APIs
+
+### Engine state API
+
+Available directly or through framework flow APIs:
+
+```js
+getValue(path)
+setValue(path, value)
+hasValue(path)
+getValueElseStop(path)
+getValueOrDefault(path, defaultValue)
+removeValue(path)
+
+getState()
+getStateAsJSON()
+
+revisionValue(path)
+ageValue(path)
+
+stopFlow()
+restartFlow()
+```
+
+### Shared wizard API
+
+Depending on the framework:
+
+```js
+say(message)
+
+chat(...)
+askChat(...)
+embedChat(...)
+
+askForm(...)
+embedForm(...)
+
+askData(...)
+
+pushIndent()
+popIndent()
+setIndent(level)
+
+lockValue(path)
+unlockValue(path)
+```
+
+### Form interaction
+
+The current `FormWizard` includes:
+
+```js
+askText(...)
+askMultiText(...)
+askRadio(...)
+askCheckbox(...)
+askTextWithAction(...)
+askList(...)
+actionButton(...)
+submitButton(...)
+```
+
+### Chat interaction
+
+The current `ChatWizard` includes:
+
+```js
+askText(...)
+askMultiText(...)
+askRadio(...)
+askCheckbox(...)
+askButton(...)
+askButtonForced(...)
+askButtonNowait(...)
+askList(...)
+actionButton(...)
+```
+
+### Page interaction
+
+The current `PagesWizard` includes:
+
+```js
+beginPage(...)
+endPage(...)
+affordBack(...)
+affordNext(...)
+
+askForm(...)
+embedForm(...)
+askChat(...)
+embedChat(...)
+```
+
+The API is experimental. Names and signatures may change.
+
+## What Recause is — and is not
+
+Recause is:
+
+- a programming model for incremental flows;
+- a small stateful execution runtime;
+- a foundation for domain-specific interaction frameworks;
+- a way to express interactive logic in ordinary code;
+- an experiment in making state the explicit cause of continued execution.
+
+Recause is not:
+
+- React or a virtual DOM;
+- a component framework;
+- a form schema;
+- BPMN;
+- a finite-state-machine editor;
+- a durable workflow service;
+- an AI agent framework;
+- a production-ready government forms platform.
+
+It can potentially underpin form, chat, page, approval, configuration, review, voice, or async interaction frameworks. That does not make it a replacement for the operational ecosystems around mature products.
+
+## Why not a state machine?
+
+State machines are excellent when states and transitions are the clearest model of a problem.
+
+Recause explores a different formulation.
+
+Instead of explicitly enumerating:
+
+```text
+NAME_MISSING
+NAME_KNOWN_GOAL_MISSING
+NAME_AND_GOAL_KNOWN
+```
+
+the flow simply asks for `name`, then asks for `goal`.
+
+The accumulated facts make different portions of the function reachable.
+
+This can be dramatically more concise for interactions that are naturally described as procedural domain logic, especially when they contain:
+
+- loops;
+- dynamic collections;
+- nested subflows;
+- calculations;
+- ordinary functions;
+- branching based on earlier values.
+
+The trade-off is that repeated execution and side effects require discipline.
+
+## Why use exceptions?
+
+`StopFlow` and `RestartFlow` need to cross arbitrary layers of normal JavaScript calls without forcing every function to return and propagate a special status value.
+
+Exceptions provide that non-local control transfer with very little ceremony.
+
+In this runtime they mean:
+
+```text
+StopFlow     the current purpose cannot progress with current state
+RestartFlow  prior state changed; evaluate again from the beginning
+```
+
+Whether exceptions are the ideal implementation mechanism in every language is an open question. The programming model matters more than the specific signal mechanism.
+
+## Portability
+
+A flow can move between engine instances when:
+
+1. all relevant progress is represented in serializable state;
+2. the receiving runtime has the same compatible flow definition;
+3. external effects and resources are handled explicitly.
+
+Conceptually:
+
+```text
+browser
+  → serialize state
+  → store or transmit
+  → create another engine
+  → load state
+  → run the same flow
+```
+
+The current implementation demonstrates the state side of this model. Production-grade distributed execution would require versioning, migration, effect guarantees, authorization, and durable storage around it.
+
+## AI and Recause
+
+Recause does not require AI.
+
+Its deterministic state-and-flow model may, however, be useful for placing AI **surgically** inside a larger controlled interaction.
+
+For example:
+
+- a normal form collects established facts;
+- a guided chat helps with one ambiguous legal question;
+- an AI proposes a classification;
+- the user confirms it;
+- the confirmed value becomes explicit state;
+- the deterministic flow continues.
+
+A future framework could preserve provenance such as:
+
+```text
+stated by applicant
+extracted from document
+proposed by model
+confirmed by applicant
+approved by reviewer
+```
+
+instead of collapsing all of these into one opaque answer.
+
+## Current status
+
+Recause is experimental.
+
+The repository currently demonstrates that the model can support:
+
+- repeated flow evaluation;
+- intentional suspension and restart;
+- hierarchical scoped state;
+- serialization;
+- nested interaction frameworks;
+- page, form, chat, and async composition;
+- repeatable lists;
+- validation;
+- history, undo, and redo;
+- a non-trivial composed application.
+
+It has not yet established:
+
+- a stable public API;
+- a formal effect system;
+- state-schema migrations;
+- durable distributed execution guarantees;
+- a renderer-independent semantic interaction tree;
+- complete accessibility and internationalization abstractions;
+- production security hardening;
+- comprehensive tests across environments.
+
+Use it to explore the model, build experiments, and challenge its assumptions.
+
+Do not yet depend on it for production-critical processes.
+
+## Possible next directions
+
+The project may evolve in several directions:
+
+- formalizing the engine semantics;
+- extracting semantic interaction from direct DOM rendering;
+- typed state and field contracts;
+- richer validation and computed values;
+- explicit effect and command handling;
+- persistence and flow-version migration;
+- visual state and execution inspection;
+- additional derived frameworks;
+- AI-assisted structural authoring of flows;
+- implementations in other programming languages.
+
+The priority is to understand and refine the programming model before turning it into a large widget library.
+
+## Why the name?
+
+New state **re-causes** execution.
+
+The flow is not resumed by restoring its old stack. It is caused to run again under changed facts.
+
+There is also a pleasing secondary association with the French *recauser*: to talk together again.
+
+## Design principle
+
+```text
+Motion explains the model.
+```
+
+The interactive visualization on [recause.org](https://recause.org) presents the same cycle embodied by the runtime:
+
+```text
+FLOW → STOP → STATE → RE-ENTRY
+```
+
+## Contributing
+
+The most valuable contributions at this stage are:
+
+- critical examples where the model becomes awkward;
+- comparisons with related programming models;
+- tests that clarify intended semantics;
+- derived-framework experiments;
+- proposals for side-effect handling;
+- documentation corrections;
+- constructive or destructive feedback backed by examples.
+
+If Recause resembles an existing approach or body of research, references are especially welcome.
+
+Open an issue with a minimal flow whenever possible.
+
+## License
+
+Recause is released under the [MIT License](LICENSE).
+
+## A final note
+
+Recause is deliberately small enough to read, question, copy, and change.
+
+It is not presented as the final answer to interactive programming.
+
+It is a concrete proposal:
+
+> Perhaps an interaction can be written as one ordinary flow,  
+> and perhaps missing information can be treated as a normal reason for that flow to stop and be caused again.
+
+If that way of thinking resonates with you, feedback is welcome.
 
