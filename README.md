@@ -2,10 +2,9 @@
 
 # Recause
 
-### WORK IN PROGRESS — FILES COMING SHORTLY  
-*July 11, 2026*
+### Experimental programming model and reference implementation
 
-### There is another way to write interactive software.
+There is another way to write interactive software.
 
 Write a normal flow.  
 Stop when information is missing.  
@@ -14,6 +13,16 @@ Re-run when new state arrives.
 [Website](https://recause.org) · [Live demonstration](https://recause.org/#demo)
 
 </div>
+
+---
+
+## Installation
+
+```bash
+npm install @recause/core
+```
+
+The current npm package contains the JavaScript reference runtime.
 
 ---
 
@@ -1028,3 +1037,4 @@ Beyond that lies a broader possibility:
 > Explicit state may allow several compatible flows, frameworks, runtimes, and languages to cause useful computations around the same evolving domain document.
 
 If that way of thinking resonates with you, feedback is welcome.
+
