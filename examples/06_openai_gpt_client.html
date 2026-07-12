@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>06 / OpenAI ChatGPT Client — Recause</title>
+  <link rel="stylesheet" href="../examples_layout.css">
+  <link rel="stylesheet" href="../recause.css">
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <nav>
+        <a class="brand" href="../index.html">RECAUSE</a>
+        <div class="navlinks">
+          <a href="../index.html#model">MODEL</a>
+          <a href="../index.html#demo">DEMO</a>
+          <a class="keep" href="https://github.com/Ruebennase/Recause" target="_blank" rel="noreferrer">GITHUB</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="demo-frame">
+    <section class="demo-intro" aria-labelledby="demo-title">
+      <div>
+        <div class="demo-kicker">CORE CONCEPT EXAMPLES</div>
+        <h1 id="demo-title">06 / OpenAI ChatGPT Client</h1>
+        <p>A complete ChatGPT interface. Enter a client-side API key to run a stateful, multi-turn conversational chat completion loop with gpt-4o-mini.</p>
+      </div>
+      <a class="back-link" href="../examples_home.html">← BACK TO THE RECAUSE DEMOS HOME</a>
+    </section>
+
+    <!-- Collapsible Code Viewer -->
+    <details class="code-details">
+      <summary class="code-summary">
+        <span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          View Source: chatgptFlow Flow Function
+        </span>
+        <span class="summary-hint"></span>
+      </summary>
+      <div class="code-content">
+        <pre><code id="flow-code-block"></code></pre>
+      </div>
+    </details>
+
+    <div class="demo-surface" style="background: #111; border-color: #222;">
+      <header class="demo-toolbar" style="background: #1a1a1a; border-bottom-color: #2b2b2b; color: #fff;">
+        <div class="demo-toolbar-title">
+          <span>06 / OpenAI ChatGPT Client</span>
+        </div>
+      </header>
+
+      <div class="app-layout" style="padding: 24px; background: #111;">
+        <main style="width: 100%;">
+          <div id="default-page-wizard-container" style="max-width: 100%; margin: 0; padding: 0; background: transparent; border: 0; min-height: auto;"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer" style="border-top: 1px solid #1a1a1a;">
+    <span>© 2026 Ruebennase. All rights reserved.</span>
+    <span>Created with admiration for the work of Felipe Pantone and Ryoji Ikeda.</span>
+  </footer>
+
+  <!-- Load Recause Files -->
+  <script src="../recauseEngine.js"></script>
+  <script src="../baseWizard.js"></script>
+  <script src="../formWizard.js"></script>
+  <script src="../chatWizard.js"></script>
+  <script src="../pagesWizard.js"></script>
+  <script src="../asyncWizard.js"></script>
+
+  <script>
+    function chatgptFlow(pages) {
+      pages.beginPage("01 / API Authentication", "Start Chatting >>");
+      
+      pages.say("To communicate with OpenAI's API, please supply your API Key. The key is only shared with api.openai.com. But be careful anyways, savvy?");
+
+      pages.askForm("keyForm", function (form) {
+        form.askText("OpenAI API Key", "apiKey", { required: true });
+        form.submitButton("Save API Key", "isSaved");
+      });
+
+      pages.endPage();
+
+      // PAGE 2: Chat dialog session
+      pages.beginPage("02 / Conversational Chat", false, "<< Configure API Key");
+
+      const apiKey = pages.getValue("/keyForm.apiKey");
+      if (!apiKey) {
+        pages.say("⚠️ Please return to Page 1 and save a valid API key first.");
+        pages.endPage();
+        return;
+      }
+
+      pages.askChat("gptChat", function (chat) {
+        chat.say("💬 **OpenAI Chat Session Active.** Ask anything:");
+        chat.say("Note that each question creates its own context.");
+
+        // Print existing message history array
+        const history = chat.getValue("history") || [];
+        history.forEach(turn => {
+          chat.say(turn.prompt, "chat-user-say");
+          chat.say(turn.response);
+        });
+
+        // Prompt input field for current turn
+        chat.askText("Ask GPT (gpt-4o-mini)...", "currentPrompt");
+
+        const prompt = chat.getValue("currentPrompt");
+        if (prompt) {
+          // Trigger fetch using askData suspense primitive
+          const response = chat.askData(
+            "Calling OpenAI API...", 
+            "currentResponse", 
+            () => {
+              return fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": "Bearer " + apiKey
+                },
+                body: JSON.stringify({
+                  model: "gpt-4o-mini",
+                  messages: [{ role: "user", content: prompt }]
+                })
+              })
+              .then(r => {
+                if (!r.ok) throw new Error("API call failed: " + r.statusText);
+                return r.json();
+              })
+              .then(d => d.choices[0].message.content);
+            }
+          );
+
+          if (response) {
+            // Push prompt/response pair to history array
+            const newHistory = [...history, { prompt, response }];
+            chat.setValue("history", newHistory);
+            
+            // Reset input values for the next turn
+            chat.removeValue("currentPrompt");
+            chat.removeValue("currentResponse");
+            
+            // Re-run the flow to trigger a fresh chat cycle
+            chat.runFlow();
+          }
+        }
+      });
+
+      pages.endPage();
+    }
+
+    function highlightRecauseCode(codeStr) {
+      return codeStr
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Populate code viewer
+      const codeBlock = document.getElementById("flow-code-block");
+      if (codeBlock) {
+        codeBlock.innerHTML = highlightRecauseCode(chatgptFlow.toString());
+      }
+      
+      const container = document.getElementById("default-page-wizard-container");
+      const wiz = new PagesWizard(container, {}, chatgptFlow, null, { recordHistory: true });
+      wiz.runFlow();
+    });
+  </script>
+</body>
+</html>
