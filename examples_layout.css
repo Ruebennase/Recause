@@ -1,0 +1,288 @@
+/* ==========================================================================
+   Recause Examples Layout Stylesheet (examples_layout.css)
+   Contains navbar, footer, layout grid, and code viewer styles for examples.
+   Prevents CSS pollution into form/chat components.
+   ========================================================================== */
+
+:root {
+  --recause-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --recause-yellow: #ffe600;
+  --recause-line: #1a1a1a;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #000;
+  color: #fff;
+  font-family: var(--recause-mono);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* --- Brand Header Navbar --- */
+.site-header {
+  padding: 18px 0;
+  border: 0;
+  border-bottom: 1px solid var(--recause-line);
+  background: #000;
+  color: #fff;
+  font-family: var(--recause-mono);
+  position: relative;
+  z-index: 30;
+}
+
+.wrap {
+  width: min(calc(100% - 48px), 1120px);
+  margin: 0 auto;
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.brand {
+  font-size: .9rem;
+  letter-spacing: .32em;
+  text-decoration: none;
+  font-weight: 700;
+  color: #fff;
+}
+
+.navlinks {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  font-size: .82rem;
+  letter-spacing: .08em;
+}
+
+.navlinks a {
+  color: #bdbdbd;
+  font-family: var(--recause-mono);
+  font-size: .82rem;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+
+.navlinks a:hover {
+  color: #fff;
+}
+
+/* --- Layout Grid --- */
+.demo-frame {
+  width: min(calc(100% - 48px), 1120px);
+  margin: 0 auto;
+  padding: 76px 0 84px;
+  flex-grow: 1;
+}
+
+.demo-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 40px;
+  color: #fff;
+  font-family: var(--recause-mono);
+  padding: 0 2px 28px;
+}
+
+.demo-kicker {
+  margin-bottom: 14px;
+  color: #b5b5b5;
+  font-size: .72rem;
+  letter-spacing: .17em;
+}
+
+.demo-intro h1 {
+  margin: 0;
+  color: #fff;
+  font-family: var(--recause-mono);
+  font-size: clamp(1.6rem, 3.3vw, 3.6rem);
+  line-height: .94;
+  letter-spacing: -.065em;
+}
+
+.demo-intro p {
+  max-width: 720px;
+  margin: 20px 0 0;
+  color: #d5d5d5;
+  font-size: .9rem;
+  line-height: 1.65;
+}
+
+.back-link {
+  color: #bdbdbd;
+  font-family: var(--recause-mono);
+  font-size: .75rem;
+  letter-spacing: .09em;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: #fff;
+}
+
+/* --- Code Details (Viewer) --- */
+.code-details {
+  background: #0f1016;
+  border: 1px solid #222;
+  border-radius: 12px;
+  margin-bottom: 2.5rem;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s ease;
+}
+
+.code-details[open] {
+  border-color: #0866ff;
+}
+
+.code-summary {
+  padding: 1.1rem 1.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #8a8a8a;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.code-summary:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.code-summary span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-hint {
+  font-size: 0.76rem;
+  font-weight: 400;
+  color: #a5a5a5;
+}
+
+.code-content {
+  border-top: 1px solid #1a1a1a;
+  background: #050608;
+  padding: 1.4rem;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.code-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.code-content::-webkit-scrollbar-track {
+  background: #050608;
+}
+
+.code-content::-webkit-scrollbar-thumb {
+  background: #0866ff;
+  border-radius: 4px;
+  border: 1px solid #050608;
+}
+
+.code-content::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+.code-content pre {
+  margin: 0;
+  font-family: var(--recause-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre;
+  color: #eee;
+}
+
+/* --- Demo Surface --- */
+.demo-surface {
+  overflow: hidden;
+  border: 1px solid #303030;
+  box-shadow: 0 28px 90px rgba(0,0,0,.56);
+}
+
+.demo-toolbar {
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.demo-toolbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-family: var(--recause-mono);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* Set box-sizing globally for layout predictability */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* --- Footer --- */
+.site-footer {
+  width: min(calc(100% - 48px), 1120px);
+  margin: 0 auto;
+  padding: 26px 0 44px;
+  border-top: 1px solid #151515;
+  color: #a5a5a5;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  font-family: var(--recause-mono);
+  font-size: .68rem;
+  letter-spacing: .08em;
+}
+
+@media (max-width: 760px) {
+  .site-header {
+    padding: 18px 0;
+  }
+  .demo-frame {
+    width: calc(100% - 24px);
+    padding: 32px 0 48px;
+  }
+  .demo-intro {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding-bottom: 18px;
+  }
+  .demo-surface {
+    border-radius: 8px;
+  }
+  .site-footer {
+    width: calc(100% - 24px);
+    flex-direction: column;
+  }
+}

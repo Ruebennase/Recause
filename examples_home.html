@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recause Metaframework - Examples & Demos Directory</title>
+  <style>
+    :root {
+      --bg-dark: #000000;
+      --panel-bg: #090909;
+      --border-color: #222222;
+      --text-main: #ffffff;
+      --text-muted: #b8b8b8;
+      --accent-cyan: #00e5ff;
+      --accent-cyan-hover: #54f0ff;
+      --tag-bg: #141414;
+      --tag-color: #888888;
+      --recause-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--recause-mono);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+
+    header.site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      padding: 18px 0;
+      background: linear-gradient(#000 60%, transparent);
+      font-family: var(--recause-mono);
+    }
+
+    .wrap {
+      width: min(calc(100% - 48px), 1120px);
+      margin: 0 auto;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .brand {
+      font-size: .9rem;
+      letter-spacing: .32em;
+      text-decoration: none;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .navlinks {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      font-size: .82rem;
+      letter-spacing: .08em;
+    }
+
+    .navlinks a {
+      text-decoration: none;
+      color: #d7d7d7;
+    }
+
+    .navlinks a:hover {
+      color: #fff;
+    }
+
+    .intro-section {
+      padding: 130px 0 30px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .kicker {
+      font-size: .84rem;
+      letter-spacing: .18em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .intro-section h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4.4rem);
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.05em;
+    }
+
+    .intro-section p {
+      margin: 1.5rem 0 0;
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 800px;
+    }
+
+    .container {
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 3rem 24px;
+      box-sizing: border-box;
+      flex-grow: 1;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.5rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3.5rem;
+    }
+
+    /* Card Styling */
+    .card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    .card h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .card p {
+      margin: 0 0 1.25rem;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      flex-grow: 1;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 1.5rem;
+    }
+
+    .tag {
+      background: var(--tag-bg);
+      color: var(--tag-color);
+      font-size: 0.72rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+      letter-spacing: 0.025em;
+    }
+
+    .tag.flagship {
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--accent-cyan);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: var(--text-main);
+      text-decoration: none;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid #333;
+      cursor: pointer;
+      font-family: var(--recause-mono);
+      letter-spacing: 0.04em;
+    }
+
+    .btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+      border-color: var(--accent-cyan);
+    }
+
+    .btn-primary {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-cyan);
+      border-color: var(--accent-cyan);
+      color: #000;
+    }
+
+    footer {
+      padding: 34px 0 52px;
+      color: #666;
+      font-size: 0.78rem;
+      border-top: 1px solid #111;
+      letter-spacing: 0.02em;
+    }
+
+    .footer-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .footer-note {
+      font-size: 0.78rem;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <nav>
+        <a class="brand" href="index.html">RECAUSE</a>
+        <div class="navlinks">
+          <a href="index.html#model">MODEL</a>
+          <a href="index.html#demo">DEMO</a>
+          <a class="keep" href="https://github.com/Ruebennase/Recause" target="_blank" rel="noreferrer">GITHUB</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <section class="intro-section">
+    <div class="wrap">
+      <div class="kicker">INTERACTIVE EXAMPLES</div>
+      <h1>Recause Demos</h1>
+      <p>Feel free to use these demos as you wish. Explore and scavenge as you like.</p>
+    </div>
+  </section>
+
+  <div class="container">
+    
+    <!-- Flagship Section -->
+    <div class="section-title">Flagship Demo</div>
+    <div class="grid" style="grid-template-columns: 1fr;">
+      <div class="card" style="flex-direction: row; align-items: center; gap: 2rem; flex-wrap: wrap;">
+        <div style="flex: 2; min-width: 250px;">
+          <h3>Group Trip Budget Planner</h3>
+          <p>A multi-page wizard managing group onboarding, destination selection, itemized lodging, activity lists, and split costs. Features collapsible source code viewer of the flow function.</p>
+          <div class="tags">
+            <span class="tag">PagesWizard Framework</span>
+            <span class="tag">FormWizard Framework</span>
+            <span class="tag">ChatWizard Framework</span>
+          </div>
+        </div>
+        <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; justify-content: center;">
+          <a href="premiumDemo.html" class="btn btn-primary" style="padding: 0.8rem 1.5rem;">Launch Flagship Demo</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core Concept Examples -->
+    <div class="section-title">Core Concept Examples</div>
+    <div class="grid">
+      
+      <!-- Minimal Page -->
+      <div class="card">
+        <h3>01 / Minimal PageWizard</h3>
+        <p>A bare-minimum implementation showing multi-page routing and back/forth history transitions while retaining scoped values.</p>
+        <div class="tags">
+          <span class="tag">PagesWizard Framework</span>
+          <span class="tag">Minimal</span>
+        </div>
+        <a href="examples/01_minimal_page.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+      <!-- Standalone Form -->
+      <div class="card">
+        <h3>02 / Minimal FormWizard</h3>
+        <p>A standalone form demonstrating text fields, regex patterns, checkbox arrays, dynamic error logging, and submission validation.</p>
+        <div class="tags">
+          <span class="tag">FormWizard Framework</span>
+          <span class="tag">Validation</span>
+        </div>
+        <a href="examples/02_minimal_form.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+      <!-- Standalone Chat -->
+      <div class="card">
+        <h3>03 / Minimal ChatWizard</h3>
+        <p>A standalone chatbot dialogue tree showcasing conversational quick-replies, radio selections, and logical branching options.</p>
+        <div class="tags">
+          <span class="tag">ChatWizard Framework</span>
+          <span class="tag">Dialogue</span>
+        </div>
+        <a href="examples/03_minimal_chat.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+    </div>
+
+    <!-- Advanced Examples -->
+    <div class="section-title">Advanced Interactions</div>
+    <div class="grid">
+      
+      <!-- Nested Features -->
+      <div class="card">
+        <h3>04 / Nested Wizards</h3>
+        <p>Illustrates parent-child scope nesting (Chat-inside-Form-inside-Page and Form-inside-Chat-inside-Page) reading and writing from shared scoped paths.</p>
+        <div class="tags">
+          <span class="tag">PagesWizard Framework</span>
+          <span class="tag">ChatWizard Framework</span>
+          <span class="tag">FormWizard Framework</span>
+          <span class="tag">Nesting</span>
+          <span class="tag">Complex Scope</span>
+        </div>
+        <a href="examples/04_nested_features.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+      <!-- Async Backend -->
+      <div class="card">
+        <h3>05 / Async API Suspense</h3>
+        <p>Shows how to utilize AsyncWizard's askData suspender primitive to query public REST endpoints without double-triggering during flow runs.</p>
+        <div class="tags">
+          <span class="tag">AsyncWizard</span>
+          <span class="tag">PagesWizard Framework</span>
+          <span class="tag">FormWizard Framework</span>
+          <span class="tag">REST API</span>
+        </div>
+        <a href="examples/05_async_backend.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+      <!-- OpenAI ChatGPT Client -->
+      <div class="card">
+        <h3>06 / OpenAI ChatGPT Client</h3>
+        <p>A complete ChatGPT interface. Enter a client-side API key to run a stateful, multi-turn conversational chat completion loop with gpt-4o-mini. The page does not expose your API key elsewhere, but beware anyways. WORK IN PROGRESS</p>
+        <div class="tags">
+          <span class="tag">AsyncWizard</span>
+          <span class="tag">PagesWizard Framework</span>
+          <span class="tag">ChatWizard Framework</span>
+          <span class="tag">FormWizard Framework</span>
+          <span class="tag">OpenAI Chat</span>
+          <span class="tag">State Loop</span>
+        </div>
+        <a href="examples/06_openai_gpt_client.html" class="btn btn-primary">Launch Demo</a>
+      </div>
+
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="wrap footer-row">
+      <span>© 2026 Ruebennase. All rights reserved.</span>
+      <span class="footer-note">Created with admiration for the work of Felipe Pantone and Ryoji Ikeda.</span>
+    </div>
+  </footer>
+
+</body>
+</html>

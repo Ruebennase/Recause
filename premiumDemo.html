@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Composed Demo — Recause</title>
+  <!-- Load Premium SaaS Dashboard Styles -->
+  <link rel="stylesheet" href="premiumDemo.css?v=21">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <nav>
+        <a class="brand" href="index.html">RECAUSE</a>
+        <div class="navlinks">
+          <a href="index.html#model">MODEL</a>
+          <a href="index.html#demo">DEMO</a>
+          <a class="keep" href="https://github.com/Ruebennase/Recause" target="_blank" rel="noreferrer">GITHUB</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="demo-frame">
+    <section class="demo-intro" aria-labelledby="demo-title">
+      <div>
+        <div class="demo-kicker">DERIVED FRAMEWORKS IN COMBINATION</div>
+        <h1 id="demo-title">Group Trip Planner</h1>
+        <p>A composed Recause example combining pages, forms, chat, lists, validation, derived values, and reversible state.</p>
+      </div>
+      <a class="back-link" href="examples_home.html">← BACK TO THE RECAUSE DEMOS HOME</a>
+    </section>
+
+    <!-- Collapsible Code Viewer (Dark Theme above the interactive surface) -->
+    <details class="code-details">
+      <summary class="code-summary">
+        <span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          View Source: groupTripWizard Flow Function
+        </span>
+        <span class="summary-hint"></span>
+      </summary>
+      <div class="code-content">
+        <pre><code id="flow-code-block"></code></pre>
+      </div>
+    </details>
+
+    <div class="demo-surface">
+      <header class="demo-toolbar">
+        <div class="demo-toolbar-title">
+          <span>Group Trip Planner</span>
+        </div>
+        <div class="toolbar" aria-label="History controls">
+          <button id="undo-btn" class="toolbar-btn" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7v6h6"/>
+              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+            </svg>
+            Undo
+          </button>
+          <button id="redo-btn" class="toolbar-btn" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 7v6h-6"/>
+              <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>
+            </svg>
+            Redo
+          </button>
+        </div>
+      </header>
+
+      <div class="app-layout">
+        <main>
+          <div id="page-wizard-container"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <span>© 2026 Ruebennase. All rights reserved.</span>
+    <span>Created with admiration for the work of Felipe Pantone and Ryoji Ikeda.</span>
+  </footer>
+
+  <!-- Load Recause Files (with cache-busters) -->
+  <script src="recauseEngine.js?v=21"></script>
+  <script src="baseWizard.js?v=21"></script>
+  <script src="formWizard.js?v=21"></script>
+  <script src="chatWizard.js?v=21"></script>
+  <script src="pagesWizard.js?v=21"></script>
+  <script src="asyncWizard.js?v=21"></script>
+
+  <script>
+    // Global references
+    let wiz = null;
+
+    // --- Complex Multi-Page Wizard Flow    // --- Helper Functions to Extract Calculations ---
+    function getTravelers(pages) {
+      const travelerIds = pages.getValue("/onboardingForm.travelers") || [];
+      return travelerIds.map(tid => {
+        return { id: tid, name: pages.getValue(`/onboardingForm.travelers_${tid}.name`) || `Traveler` };
+      }).filter(t => t.name && t.name.trim() !== "");
+    }
+
+    function calculateTripSplit(pages, travelers) {
+      // 1. Lodging calculations
+      const lodgingIds = pages.getValue("/lodgingChat.lodgings") || [];
+      let totalLodgingCost = 0;
+      const lodgingItems = [];
+      const individualCosts = {};
+      
+      travelers.forEach(t => {
+        individualCosts[t.id] = { lodging: 0, activities: 0, items: [], total: 0, paid: 0 };
+      });
+
+      lodgingIds.forEach(lid => {
+        const isSaved = pages.getValue(`/lodgingChat.lodgings_${lid}.isSaved`);
+        if (isSaved) {
+          const name = pages.getValue(`/lodgingChat.lodgings_${lid}.name`) || "Unnamed Lodging";
+          const cost = parseFloat(pages.getValue(`/lodgingChat.lodgings_${lid}.cost`) || "0");
+          const payerId = pages.getValue(`/lodgingChat.lodgings_${lid}.payerId`) || (travelers[0] ? travelers[0].id : "");
+          totalLodgingCost += cost;
+          lodgingItems.push({ name, cost });
+          if (individualCosts[payerId]) {
+            individualCosts[payerId].paid += cost;
+          }
+        }
+      });
+
+      // 2. Activity calculations
+      const activityIds = pages.getValue("/activityChat.activities") || [];
+      let totalActivityCost = 0;
+      const activityItems = [];
+      
+      activityIds.forEach(aid => {
+        const isSaved = pages.getValue(`/activityChat.activities_${aid}.isSaved`);
+        if (isSaved) {
+          const name = pages.getValue(`/activityChat.activities_${aid}.name`) || "Unnamed Activity";
+          const cost = parseFloat(pages.getValue(`/activityChat.activities_${aid}.cost`) || "0");
+          const payerId = pages.getValue(`/activityChat.activities_${aid}.payerId`) || (travelers[0] ? travelers[0].id : "");
+          
+          const rawParticipants = pages.getValue(`/activityChat.activities_${aid}.participants`);
+          let participants = [];
+          if (typeof rawParticipants === "string") {
+            participants = rawParticipants.split(",").map(x => x.trim()).filter(Boolean);
+          } else if (Array.isArray(rawParticipants)) {
+            participants = rawParticipants;
+          }
+          
+          totalActivityCost += cost;
+          activityItems.push({ name, cost, participants });
+          if (individualCosts[payerId]) {
+            individualCosts[payerId].paid += cost;
+          }
+        }
+      });
+
+      // Split Lodging equally
+      const lodgingPerPerson = travelers.length > 0 ? (totalLodgingCost / travelers.length) : 0;
+      travelers.forEach(t => {
+        individualCosts[t.id].lodging = lodgingPerPerson;
+      });
+
+      // Split Activities only among participants
+      activityItems.forEach(item => {
+        const activeParticipants = item.participants.filter(pid => travelers.some(t => t.id === pid));
+        const share = activeParticipants.length > 0 ? (item.cost / activeParticipants.length) : 0;
+        activeParticipants.forEach(pid => {
+          if (individualCosts[pid]) {
+            individualCosts[pid].activities += share;
+            individualCosts[pid].items.push(`${item.name} ($${share.toFixed(2)})`);
+          }
+        });
+      });
+
+      // Calculate totals per traveler
+      travelers.forEach(t => {
+        const costObj = individualCosts[t.id];
+        costObj.total = costObj.lodging + costObj.activities;
+      });
+
+      // Calculate settlements
+      const balances = {};
+      travelers.forEach(t => {
+        const costObj = individualCosts[t.id];
+        balances[t.id] = costObj.paid - costObj.total;
+      });
+
+      const debtors = [];
+      const creditors = [];
+      travelers.forEach(t => {
+        const bal = balances[t.id];
+        if (bal < -0.01) {
+          debtors.push({ id: t.id, name: t.name, amount: -bal });
+        } else if (bal > 0.01) {
+          creditors.push({ id: t.id, name: t.name, amount: bal });
+        }
+      });
+
+      const settlements = [];
+      let dIdx = 0;
+      let cIdx = 0;
+      while (dIdx < debtors.length && cIdx < creditors.length) {
+        const debtor = debtors[dIdx];
+        const creditor = creditors[cIdx];
+        const amount = Math.min(debtor.amount, creditor.amount);
+
+        settlements.push({
+          from: debtor.name,
+          to: creditor.name,
+          amount: amount
+        });
+
+        debtor.amount -= amount;
+        creditor.amount -= amount;
+
+        if (debtor.amount < 0.01) dIdx++;
+        if (creditor.amount < 0.01) cIdx++;
+      }
+
+      return {
+        lodgingItems,
+        totalLodgingCost,
+        activityItems,
+        totalActivityCost,
+        grandTotal: totalLodgingCost + totalActivityCost,
+        individualCosts,
+        settlements
+      };
+    }
+
+    // --- Complex Multi-Page Wizard Flow ---
+    function groupTripWizard(pages) {
+      const travelers = getTravelers(pages);
+      const travelerNames = travelers.map(t => t.name);
+
+      // PAGE 1: Trip Scope & Traveler List
+      pages.beginPage(`01 / Group & Destination`, "Configure Lodgings >>");
+      pages.say("Welcome! Let's construct a detailed itinerary and shared group budget planner.");
+
+      pages.askForm("onboardingForm", function (form) {
+        form.askText("Trip Destination Name", "tripName", { required: true, errorMsg: "Trip destination name is required" });
+        form.askText("Target Shared Budget ($)", "targetBudget", { required: true, pattern: /^\d+$/, errorMsg: "Budget must be a positive number" });
+
+        form.askList("Travelers Group Members", "travelers", function (itemForm) {
+          itemForm.askText("Traveler Name", "name", { required: true, errorMsg: "Traveler name is required" });
+        });
+
+        // Non-blocking embedded budget coordinator assistant
+        form.chat("CHAT ASSISTANT", "assistant", false, function (chat) {
+          const targetBudget = parseFloat(pages.getValue("/onboardingForm.targetBudget") || "0");
+          const numTravelers = travelers.length;
+
+          chat.say("Hello! I am your Group Budget Coordinator. I can help you structure your target budget dynamically.");
+
+          if (targetBudget <= 0) {
+            chat.say("💡 *Tip: Enter a Target Shared Budget above, and I will help you calculate daily allocations!*");
+            return;
+          }
+
+          if (numTravelers === 0) {
+            chat.say("💡 *Tip: Add some travelers, and I'll calculate per-person shares!*");
+            return;
+          }
+
+          chat.askButton("Would you like to analyze your daily per-person allocation?", "analyze", [
+            { value: "yes", label: "Yes, analyze" },
+            { value: "no", label: "No, skip" }
+          ]);
+
+          if (chat.getValue("analyze") === "yes") {
+            chat.askRadio("What is the planned trip duration?", "duration", [
+              { value: "3", label: "3 Days / Weekend" },
+              { value: "5", label: "5 Days / Short Trip" },
+              { value: "7", label: "7 Days / Full Week" },
+              { value: "10", label: "10+ Days / Extended" }
+            ]);
+
+            const days = parseInt(chat.getValue("duration") || "0");
+            if (days > 0) {
+              const dailyPerPerson = targetBudget / numTravelers / days;
+              chat.say(`With a total budget of **$${targetBudget.toFixed(2)}** for **${numTravelers} travelers** over **${days} days**, your average daily budget per traveler is **$${dailyPerPerson.toFixed(2)}/day**.`);
+
+              chat.askRadio("What is your group's main spending priority?", "priority", [
+                { value: "lodging", label: "Comfortable Lodgings (Hotel/Villa)" },
+                { value: "activities", label: "Excursions & Exhilarating Activities" },
+                { value: "dining", label: "Local Dining & Food Tours" }
+              ]);
+
+              const priority = chat.getValue("priority");
+              if (priority === "lodging") {
+                chat.say(`🏨 **Lodging Focus**: Spend ~60% ($${(dailyPerPerson * 0.6).toFixed(2)}/day) on accommodation, 25% on food, and 15% on activities.`);
+              } else if (priority === "activities") {
+                chat.say(`🏃 **Activities Focus**: Spend ~40% on lodging, 20% on food, and 40% ($${(dailyPerPerson * 0.4).toFixed(2)}/day) on excursions.`);
+              } else if (priority === "dining") {
+                chat.say(`🍽️ **Dining Focus**: Spend ~40% on lodging, 45% ($${(dailyPerPerson * 0.45).toFixed(2)}/day) on dining, and 15% on activities.`);
+              }
+
+              chat.askButton("Should we set aside a 10% contingency reserve fund?", "contingency", [
+                { value: "yes", label: "Yes, reserve 10%" },
+                { value: "no", label: "No reserve needed" }
+              ]);
+
+              if (chat.getValue("contingency") === "yes") {
+                const reserve = targetBudget * 0.1;
+                chat.say(`⚠️ **Reserve Recommended**: $${reserve.toFixed(2)} is set aside as buffer. Split budget is $${(targetBudget - reserve).toFixed(2)}.`);
+              }
+            }
+          }
+        });
+
+        form.submitButton("Confirm Onboarding Scope", "isSubmitted", "Confirmed");
+      });
+      pages.endPage();
+
+      // PAGE 2: Dynamic Room / Lodging Booking Loop
+      pages.beginPage(`02 / Lodgings Booking`, "Configure Activities >>", "<< Back to Scope");
+      pages.say("Specify all lodgings/hotels for your trip. You can dynamically add or remove bookings.");
+
+      pages.chat("lodgingChat", function (chat) {
+        chat.say(`Hey ${travelerNames.join(", ") || "Travelers"}! Let's book your places to stay.`);
+        
+        chat.askList("Lodgings", "lodgings", function (form) {
+          form.askText("Hotel / Airbnb Name", "name", { required: true, errorMsg: "Hotel name is required" });
+          form.askText("Total Room Cost ($)", "cost", { required: true, pattern: /^\d+(\.\d{1,2})?$/, errorMsg: "Lodging cost must be a positive number" });
+          const travelerChoices = travelers.map(t => ({ value: t.id, label: t.name }));
+          form.askRadio("Who paid for this lodging?", "payerId", travelerChoices, { required: true, errorMsg: "Payer must be selected" });
+          form.askCheckbox("Included Features:", "features", [
+            { value: "breakfast", label: "Breakfast included" },
+            { value: "wifi", label: "Free Wi-Fi" },
+            { value: "pool", label: "Pool access" }
+          ]);
+          form.submitButton("Verify Booking Details", "isSaved", "Verified");
+        });
+      });
+      pages.endPage();
+
+      // PAGE 3: Activities Scheduling
+      pages.beginPage(`03 / Activities Scheduling`, "Review Budget & Split >>", "<< Back to Lodgings");
+      pages.say("Schedule group excursions and select participants. Costs are split only among the members who join each activity!");
+
+      pages.chat("activityChat", function (chat) {
+        if (travelers.length === 0) {
+          chat.say("⚠️ Please add travelers on Page 1 first before configuring activities.");
+          return;
+        }
+
+        chat.say(`Hey guys, let's schedule the fun stuff!`);
+        
+        chat.askList("Activities", "activities", { required: false }, function (form) {
+          form.askText("Activity Name (e.g. Wine Tasting)", "name", { required: true, errorMsg: "Activity name is required" });
+          form.askText("Activity Cost ($)", "cost", { required: true, pattern: /^\d+(\.\d{1,2})?$/, errorMsg: "Activity cost must be a positive number" });
+          const choices = travelers.map(t => ({ value: t.id, label: t.name }));
+          form.askRadio("Who paid for this activity?", "payerId", choices, { required: true, errorMsg: "Payer must be selected" });
+          form.askCheckbox("Who joins this activity?", "participants", choices, { required: true, errorMsg: "At least one participant must be selected" });
+          form.submitButton("Verify Activity Details", "isSaved", "Verified");
+        });
+      });
+      pages.endPage();
+
+      // PAGE 4: Final Split Summary
+      pages.beginPage(`04 / Shared Split Summary`, "Finalize Trip Plan >>", "<< Back to Activities");
+      pages.say("Detailed review of lodging and activity splits per traveler.");
+
+      pages.askForm("summaryForm", function (form) {
+        const dest = pages.getValue("/onboardingForm.tripName") || "Unknown Destination";
+        const maxBudget = parseFloat(pages.getValue("/onboardingForm.targetBudget") || "0");
+        const data = calculateTripSplit(pages, travelers);
+
+        form.say(`### Trip: **${dest}**`);
+
+        if (data.lodgingItems.length > 0) {
+          form.say("#### Accommodations:");
+          data.lodgingItems.forEach(item => {
+            form.say(`- **${item.name}**: $${item.cost.toFixed(2)}`);
+          });
+          form.say(`- **Total Lodging**: **$${data.totalLodgingCost.toFixed(2)}**`);
+        }
+
+        if (data.activityItems.length > 0) {
+          form.say("#### Activities & Excursions:");
+          data.activityItems.forEach(item => {
+            const pNames = item.participants
+              .map(pid => pages.getValue(`/onboardingForm.travelers_${pid}.name`))
+              .filter(Boolean);
+            form.say(`- **${item.name}**: $${item.cost.toFixed(2)} (Joined: ${pNames.join(", ") || "Nobody"})`);
+          });
+          form.say(`- **Total Activities**: **$${data.totalActivityCost.toFixed(2)}**`);
+        }
+
+        form.say(`### **Grand Total Expense**: **$${data.grandTotal.toFixed(2)}**`);
+
+        form.say("#### Split Breakdown per Person:");
+        travelers.forEach(t => {
+          const costObj = data.individualCosts[t.id];
+          form.say(`- **${t.name}**: Share: **$${costObj.total.toFixed(2)}** | Paid: **$${costObj.paid.toFixed(2)}**`);
+          form.pushIndent();
+          form.say(`- Lodging Share: $${costObj.lodging.toFixed(2)}`);
+          if (costObj.items.length > 0) {
+            form.say(`- Activities: ${costObj.items.join(", ")}`);
+          } else {
+            form.say(`- Activities: None`);
+          }
+          form.popIndent();
+        });
+
+        if (data.settlements.length > 0) {
+          form.say("#### Recommended Settlements:");
+          data.settlements.forEach(s => {
+            form.say(`- **${s.from}** owes **${s.to}** **$${s.amount.toFixed(2)}**`);
+          });
+        } else if (travelers.length > 1) {
+          form.say("#### Recommended Settlements:");
+          form.say("- ✅ Everyone is fully settled up!");
+        }
+
+        // Budget Warning
+        if (maxBudget > 0 && data.grandTotal > maxBudget) {
+          form.say(`⚠️ **Warning**: Total expenses ($${data.grandTotal.toFixed(2)}) exceed your target budget ($${maxBudget.toFixed(2)}) by **$${(data.grandTotal - maxBudget).toFixed(2)}**!`);
+        } else if (maxBudget > 0) {
+          form.say(`✅ **Under Target Budget**: You are currently **$${(maxBudget - data.grandTotal).toFixed(2)}** under your target budget.`);
+        }
+
+        form.submitButton("Approve & Finalize Planning", "isDeployed", "Approved & Finalized");
+      });
+
+      if (pages.getValue("summaryForm.isDeployed") === true) {
+        pages.say("🎉 **Trip Configuration Plan approved! Itinerary locked and split notifications sent.**");
+      }
+      pages.endPage();
+    }
+
+    function highlightRecauseCode(codeStr) {
+      return codeStr
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // --- App DomContentLoaded Entrypoint ---
+    document.addEventListener("DOMContentLoaded", () => {
+      const container = document.getElementById("page-wizard-container");
+
+      // Populate code viewer with highlighted groupTripWizard source
+      const codeBlock = document.getElementById("flow-code-block");
+      if (codeBlock) {
+        codeBlock.innerHTML = highlightRecauseCode(groupTripWizard.toString());
+      }
+
+      // Initialize Root PagesWizard with history enabled
+      wiz = new PagesWizard(container, null, groupTripWizard, null, { recordHistory: true });
+
+      // Update Toolbar buttons enabled/disabled states on state change
+      wiz.recauseEngine.subscribe(() => {
+        document.getElementById("undo-btn").disabled = !wiz.recauseEngine.canUndo();
+        document.getElementById("redo-btn").disabled = !wiz.recauseEngine.canRedo();
+      });
+
+      // Set up Toolbar Undo/Redo button click listeners
+      document.getElementById("undo-btn").onclick = () => {
+        wiz.discardPendingCommits();
+        if (wiz.recauseEngine.undo()) {
+          wiz.runFlow({ checkpoint: false });
+        }
+      };
+
+      document.getElementById("redo-btn").onclick = () => {
+        wiz.discardPendingCommits();
+        if (wiz.recauseEngine.redo()) {
+          wiz.runFlow({ checkpoint: false });
+        }
+      };
+
+      // First evaluation run
+      wiz.runFlow();
+    });
+  </script>
+
+</body>
+</html>
