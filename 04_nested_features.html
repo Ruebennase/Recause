@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04 / Nested Wizards — Recause</title>
+  <link rel="stylesheet" href="../examples_layout.css">
+  <link rel="stylesheet" href="../wizards.css">
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <nav>
+        <a class="brand" href="../index.html">RECAUSE</a>
+        <div class="navlinks">
+          <a href="../index.html#model">MODEL</a>
+          <a href="../index.html#demo">DEMO</a>
+          <a class="keep" href="https://github.com/Ruebennase/Recause" target="_blank" rel="noreferrer">GITHUB</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <div class="demo-frame">
+    <section class="demo-intro" aria-labelledby="demo-title">
+      <div>
+        <div class="demo-kicker">CORE CONCEPT EXAMPLES</div>
+        <h1 id="demo-title">04 / Nested Wizards</h1>
+        <p><strong>Scope Architecture Demonstration:</strong> Page 1 nests a Chat inside a Form. Page 2 nests a Form inside a Chat. Uncommitted changes block evaluations and respect the time-travel snapshots.</p>
+      </div>
+      <a class="back-link" href="../examples_home.html">← BACK TO THE RECAUSE DEMOS HOME</a>
+    </section>
+
+    <!-- Collapsible Code Viewer -->
+    <details class="code-details">
+      <summary class="code-summary">
+        <span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          View Source: nestedMainFlow Flow Function
+        </span>
+        <span class="summary-hint"></span>
+      </summary>
+      <div class="code-content">
+        <pre><code id="flow-code-block"></code></pre>
+      </div>
+    </details>
+
+    <div class="demo-surface" style="background: #111; border-color: #222;">
+      <header class="demo-toolbar" style="background: #1a1a1a; border-bottom-color: #2b2b2b; color: #fff;">
+        <div class="demo-toolbar-title">
+          <span>04 / Nested Wizards</span>
+        </div>
+      </header>
+
+      <div class="app-layout" style="padding: 24px; background: #111;">
+        <main style="width: 100%;">
+          <div id="default-page-wizard-container" style="max-width: 100%; margin: 0; padding: 0; background: transparent; border: 0; min-height: auto;"></div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer" style="border-top: 1px solid #1a1a1a;">
+    <span>© 2026 Ruebennase. All rights reserved.</span>
+    <span>Created with admiration for the work of Felipe Pantone and Ryoji Ikeda.</span>
+  </footer>
+
+  <!-- Load Recause Files -->
+  <script src="../recauseEngine.js"></script>
+  <script src="../baseWizard.js"></script>
+  <script src="../formWizard.js"></script>
+  <script src="../chatWizard.js"></script>
+  <script src="../pagesWizard.js"></script>
+  <script src="../asyncWizard.js"></script>
+
+  <script>
+    function nestedMainFlow(pages) {
+      // PAGE 1: Form nesting Chat
+      pages.beginPage("01 / Chat inside Form", "Configure Hobby Profile >>");
+      
+      pages.askForm("identityForm", function (form) {
+        form.askText("Your Name", "name", { required: true });
+
+        // Embed a Chat block inside this Form scope
+        form.chat("Assistant Chat", "assistant", false, function (chat) {
+          const userName = form.getValue("name") || "Guest";
+          chat.say(`Greetings **${userName}**! Let's configure your contact permissions.`);
+          
+          chat.askButton("Do you want newsletters?", "newsletter", [
+            { value: "yes", label: "Opt-In" },
+            { value: "no", label: "No Newsletters" }
+          ]);
+        });
+
+        form.submitButton("Confirm Identity Details", "isSubmitted", "Confirmed");
+      });
+      pages.endPage();
+
+      // PAGE 2: Chat nesting Form
+      pages.beginPage("02 / Form inside Chat", false, "<< Back to Identity");
+      
+      pages.askChat("surveyChat", function (chat) {
+        chat.say("Welcome to the second page survey!");
+        chat.askRadio("What is your favorite hobby category?", "hobbyType", [
+          { value: "sport", label: "Outdoor/Sports" },
+          { value: "tech", label: "Tech/Gaming" }
+        ]);
+
+        const type = chat.getValue("hobbyType");
+        if (type) {
+          chat.say(`Great, let's collect details for your **${type}** hobby:`);
+          
+          // Nest a sub-Form inside this Chat bubble flow!
+          chat.askForm("Details Form", "isSaved", function (subForm) {
+            subForm.askText("Activity Name", "title", { required: true });
+            subForm.askText("Hours per Week", "hours", { required: true, pattern: /^\d+$/ });
+            subForm.submitButton("Save Hobby Details", "isDone", "Saved");
+          });
+        }
+      });
+      pages.endPage();
+    }
+
+    function highlightRecauseCode(codeStr) {
+      return codeStr
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Populate code viewer
+      const codeBlock = document.getElementById("flow-code-block");
+      if (codeBlock) {
+        codeBlock.innerHTML = highlightRecauseCode(nestedMainFlow.toString());
+      }
+      
+      const container = document.getElementById("default-page-wizard-container");
+      const wiz = new PagesWizard(container, {}, nestedMainFlow, null, { recordHistory: true });
+      wiz.runFlow();
+    });
+  </script>
+</body>
+</html>
