@@ -795,6 +795,65 @@ Possible uses include project scaffolding, deployment configuration, installatio
 
 The Python runtime and CLI framework are planned experiments, not yet part of the current JavaScript implementation.
 
+## Traps and Pitfalls
+
+Because Recause binds flow execution directly with visual representation order in declarative, reactive loops, developers should be aware of a few specific pitfalls and architectural traps.
+
+### 1. The State Dependency Paradox (Deadlocks)
+
+Since the flow is executed top-down and evaluated on every state change, conditional checks depending on future values of a subflow to decide whether to mount/show that subflow can cause deadlocks.
+
+*   **The Trap**:
+    ```javascript
+    const val = pages.getValue("hobbyForm.activity");
+    if (!val) {
+      // Conditionally show the form only if not filled in
+      pages.askForm("hobbyForm", function(form) {
+        form.askText("Activity Name", "activity");
+      });
+    }
+    ```
+    Once the user types an activity (e.g. `"Chess"`) and saves, the condition `!val` becomes `false`. The form is instantly unmounted and disappears from view, leaving the user unable to edit their input.
+*   **The Solution**: Do not use a subflow's output values to conditionally hide or show that subflow itself. Keep input flows visible or utilize explicit "Edit" states or state variables separate from the inputs themselves.
+
+### 2. The "Ghost State" Trap (Stale Hidden Values)
+
+Hiding a form or wizard from visual execution does not automatically delete its stored keys and values from the underlying engine state.
+
+*   **The Trap**:
+    ```javascript
+    const wantsNewsletter = pages.getValue("wantsNewsletter");
+    if (wantsNewsletter) {
+      pages.askForm("newsletterForm", function(form) {
+        form.askText("Email Address", "email");
+      });
+    }
+    
+    // Downstream process:
+    const email = pages.getValue("newsletterForm.email");
+    ```
+    If the user checks "Yes", enters their email, then changes their mind and unchecks "Yes", the input fields disappear. However, `{ newsletterForm: { email: "..." } }` still remains in the engine state. Downstream processes will still read and submit the hidden email!
+*   **The Solution**: Downstream code must always guard against "ghost state" by validating the parent conditions (e.g. checking `wantsNewsletter`), or the developer must explicitly clear or prune the subflow's state paths inside the flow when conditions change.
+
+### 3. The Non-Idempotent Evaluation Trap (Side Effects)
+
+Because Recause re-evaluates the entire flow tree on every keystroke or click to keep the UI reactive, flow functions must be pure, deterministic, and free of side effects.
+
+*   **The Trap**:
+    ```javascript
+    pages.askForm("profileForm", function(form) {
+      form.askText("Username", "username");
+      
+      // Incrementing state inside a flow:
+      const count = form.getValue("renderCount") || 0;
+      form.setValue("renderCount", count + 1); 
+    });
+    ```
+    Every keystroke in the username field triggers a re-evaluation of the flow, causing `renderCount` to rapidly spin up and increment infinitely or cause infinite render loop errors.
+*   **The Solution**:
+    *   **Action Callbacks**: Use event handlers or custom buttons (e.g., `actionButton(label, path, callback)`) whose execution only happens once upon user interaction.
+    *   **Transition Guards**: Check state transitions explicitly using boolean flags to guarantee code runs exactly once (e.g. `if (isDone && !wasCounted) { increment(); setValue("wasCounted", true); }`).
+
 ## Related work
 
 Recause sits near several established programming ideas, but does not identify completely with any one of them.
