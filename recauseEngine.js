@@ -40,7 +40,6 @@ class RestartFlow extends Error {
   }
 }
 
-
 function isChildrenArray(val) {
   if (!Array.isArray(val)) return false;
   if (val.length === 0) return true;

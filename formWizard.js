@@ -26,6 +26,7 @@ let FormWizard;
     this.submitPathString = null;
     this.activeErrors = [];
     this.pendingCommits = [];
+    this.renderedFields = [];
 
     // Extend API with FormWizard specific methods
     Object.assign(this.api, {
@@ -49,6 +50,7 @@ let FormWizard;
     this.seq = 0; // Reset sequence on every render
     this.submitPathString = null;
     this.activeErrors = [];
+    this.renderedFields = [];
 
     // Safety Guard against infinite render loops
     const now = Date.now();
@@ -107,6 +109,37 @@ let FormWizard;
     }
   }
 
+  _trackField(label, pathString) {
+    const val = this.scopedEngine.getValue(pathString);
+    if (!this.renderedFields.some(f => f.pathString === pathString)) {
+      this.renderedFields.push({ label, pathString, value: val });
+    }
+  }
+
+  isCompleted() {
+    if (!this.submitPathString) return false;
+    return !!this.scopedEngine.getValue(this.submitPathString);
+  }
+
+  renderSummary(container) {
+    const ansLines = this.renderedFields
+      .map(f => {
+        const val = this.scopedEngine.getValue(f.pathString);
+        if (val === undefined || val === null || val === "") return null;
+        if (f.label.toLowerCase() === "isdone" || f.pathString === this.submitPathString) return null;
+        if (Array.isArray(val)) {
+          if (val.length === 0) return null;
+          return `${f.label}: ${val.join(", ")}`;
+        }
+        return `${f.label}: ${val}`;
+      })
+      .filter(Boolean);
+
+    container.className = "chat-answer-line";
+    container.style.whiteSpace = "pre-wrap";
+    container.textContent = ansLines.join("\n");
+  }
+
   say(message) {
     console.log(this.s() + "Form inside say function");
     const row = document.createElement('div');
@@ -117,6 +150,7 @@ let FormWizard;
   }
 
   askText(label, pathString, options) {
+    this._trackField(label, pathString);
     const locked = !!this.scopedEngine.getValue(`formwizard.lock.${pathString}`);
     const val = this.scopedEngine.getValue(pathString) || "";
     const validation = this.#registerFieldValidation(label, pathString, val, options);
@@ -156,6 +190,7 @@ let FormWizard;
   }
 
   askMultiText(label, pathString, options) {
+    this._trackField(label, pathString);
     const locked = !!this.scopedEngine.getValue(`formwizard.lock.${pathString}`);
     const val = this.scopedEngine.getValue(pathString) || "";
     const validation = this.#registerFieldValidation(label, pathString, val, options);
@@ -194,6 +229,7 @@ let FormWizard;
   }
 
   askCheckbox(label, pathString, options, validationOptions) {
+    this._trackField(label, pathString);
     const locked = !!this.scopedEngine.getValue(`formwizard.lock.${pathString}`);
     const valStr = this.scopedEngine.getValue(pathString) || "";
     const validation = this.#registerFieldValidation(label, pathString, valStr, validationOptions, options);
@@ -275,6 +311,7 @@ let FormWizard;
   }
 
   askRadio(label, pathString, options, validationOptions) {
+    this._trackField(label, pathString);
     const val = this.scopedEngine.getValue(pathString);
     const locked = !!this.scopedEngine.getValue(`formwizard.lock.${pathString}`);
     const validation = this.#registerFieldValidation(label, pathString, val, validationOptions, options);

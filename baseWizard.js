@@ -520,6 +520,7 @@
     _runSubWizard(question, pathString, WizardClass, subFlow, rethrowStopFlow, className) {
       const isForm = this.constructor.name === "FormWizard";
       let subContainer;
+      let block = null;
 
       if (isForm) {
         const row = this._createQuestionRow();
@@ -533,7 +534,7 @@
         subContainer.className = className;
         row.appendChild(subContainer);
       } else {
-        const block = document.createElement("div");
+        block = document.createElement("div");
         block.className = className;
         block.style.marginLeft = (this.indentLevel * 2) + "em";
         
@@ -548,7 +549,7 @@
         }
         
         subContainer = document.createElement("div");
-        const isFormW = (WizardClass.name === "FormWizard");
+        const isFormW = WizardClass.name.includes("FormWizard");
         subContainer.className = isFormW ? "chat-form-subContainer" : "chat-chat-subContainer";
         
         block.appendChild(subContainer);
@@ -557,7 +558,39 @@
 
       const subEngine = this.scopedEngine.scope(pathString);
       const subWizard = new WizardClass(subContainer, subEngine, subFlow, this.instanceId + "_" + pathString);
+      subWizard.wizardQuestion = question;
       subWizard.runFlowInline(rethrowStopFlow);
+
+      // Summary Protocol Integration for completed subwizards
+      if (block && typeof subWizard.isCompleted === "function" && subWizard.isCompleted()) {
+        subContainer.style.display = "none";
+        
+        const parentHeader = block.querySelector('.chat-question-header');
+        if (parentHeader) {
+          let editBtn = parentHeader.querySelector('.chat-edit-button');
+          if (!editBtn) {
+            editBtn = document.createElement("button");
+            editBtn.className = "chat-edit-button";
+            editBtn.textContent = "Edit";
+            editBtn.onclick = () => {
+              subEngine.setValue(subWizard.submitPathString, false);
+              this.runFlow();
+            };
+            parentHeader.appendChild(editBtn);
+          }
+        }
+
+        const ansBubble = document.createElement("div");
+        subWizard.renderSummary(ansBubble);
+        block.appendChild(ansBubble);
+      } else if (block) {
+        subContainer.style.display = "";
+        const parentHeader = block.querySelector('.chat-question-header');
+        if (parentHeader) {
+          const editBtn = parentHeader.querySelector('.chat-edit-button');
+          if (editBtn) editBtn.remove();
+        }
+      }
     }
 
     _createQuestionRow() {

@@ -252,31 +252,59 @@ let ChatWizard;
     block.className = 'chat-question-block';
     block.style.marginLeft = (this.indentLevel * 2) + "em";
 
-    const header = document.createElement('div');
-    header.className = 'chat-question-header';
-    const q = document.createElement('div');
-    q.className = 'chat-question-text';
-    q.textContent = question;
-    header.appendChild(q);
+    if (question) {
+      const header = document.createElement('div');
+      header.className = 'chat-question-header';
+      const q = document.createElement('div');
+      q.className = 'chat-question-text';
+      q.textContent = question;
+      header.appendChild(q);
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'chat-edit-button';
-    editBtn.textContent = "Edit";
-    editBtn.onclick = () => {
-      this.scopedEngine.setValue("chatwizard.currentEditingField", pathString);
-      this.runFlow();
-    };
-    editBtn.setAttribute('data-path', pathString);
-    editBtn.setAttribute('data-fid', fid);
-    this._attachFocusGuard(editBtn, fid);
-    header.appendChild(editBtn);
+      const editBtn = document.createElement('button');
+      editBtn.className = 'chat-edit-button';
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => {
+        this.scopedEngine.setValue("chatwizard.currentEditingField", pathString);
+        this.runFlow();
+      };
+      editBtn.setAttribute('data-path', pathString);
+      editBtn.setAttribute('data-fid', fid);
+      this._attachFocusGuard(editBtn, fid);
+      header.appendChild(editBtn);
 
-    block.appendChild(header);
+      block.appendChild(header);
 
-    const ans = document.createElement('div');
-    ans.className = 'chat-answer-line';
-    ans.textContent = answerVal;
-    block.appendChild(ans);
+      const ans = document.createElement('div');
+      ans.className = 'chat-answer-line';
+      ans.textContent = answerVal;
+      block.appendChild(ans);
+    } else {
+      // Clean chat bubble with next-to-bubble Edit button
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'flex';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.justifyContent = 'flex-end';
+      wrapper.style.width = '100%';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'chat-edit-button';
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => {
+        this.scopedEngine.setValue("chatwizard.currentEditingField", pathString);
+        this.runFlow();
+      };
+      editBtn.setAttribute('data-path', pathString);
+      editBtn.setAttribute('data-fid', fid);
+      this._attachFocusGuard(editBtn, fid);
+      wrapper.appendChild(editBtn);
+
+      const ans = document.createElement('div');
+      ans.className = 'chat-answer-line';
+      ans.textContent = answerVal;
+      wrapper.appendChild(ans);
+
+      block.appendChild(wrapper);
+    }
 
     this.container.appendChild(block);
   }
@@ -286,13 +314,15 @@ let ChatWizard;
     block.className = 'chat-question-block';
     block.style.marginLeft = (this.indentLevel * 2) + "em";
 
-    const header = document.createElement('div');
-    header.className = 'chat-question-header';
-    const q = document.createElement('div');
-    q.className = 'chat-question-text';
-    q.textContent = question;
-    header.appendChild(q);
-    block.appendChild(header);
+    if (question) {
+      const header = document.createElement('div');
+      header.className = 'chat-question-header';
+      const q = document.createElement('div');
+      q.className = 'chat-question-text';
+      q.textContent = question;
+      header.appendChild(q);
+      block.appendChild(header);
+    }
 
     const inp = document.createElement('input');
     inp.className = 'chat-input';
@@ -538,16 +568,20 @@ let ChatWizard;
     block.className = 'chat-question-block';
     block.style.marginLeft = (this.indentLevel * 2) + "em";
 
-    const header = document.createElement('div');
-    header.className = 'chat-question-header';
-    const q = document.createElement('div');
-    q.className = 'chat-question-text';
-    q.textContent = question;
-    header.appendChild(q);
-    block.appendChild(header);
+    if (question) {
+      const header = document.createElement('div');
+      header.className = 'chat-question-header';
+      const q = document.createElement('div');
+      q.className = 'chat-question-text';
+      q.textContent = question;
+      header.appendChild(q);
+      block.appendChild(header);
+    }
 
     const btnRow = document.createElement('div');
     btnRow.className = 'chat-button-row';
+
+    const currentValue = this.scopedEngine.getValue(pathString);
 
     options.forEach((opt, idx) => {
       const btn = document.createElement('button');
@@ -557,6 +591,10 @@ let ChatWizard;
 
       const subFid = `${groupFid}_opt${idx}`;
       btn.setAttribute('data-fid', subFid);
+
+      if (currentValue !== undefined && String(opt.value) === String(currentValue)) {
+        btn.disabled = true;
+      }
 
       if (typeof focusManager !== "undefined") {
         btn.addEventListener('focus', () => focusManager.trackFocus(btn));

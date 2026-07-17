@@ -535,6 +535,20 @@ embedChat(...)
 
 The API is experimental. Names and signatures will change.
 
+### Execution Semantics: ask* vs. embed*
+
+When nesting subwizards (e.g., forms inside chats, or chats inside forms), the framework offers two distinct execution semantics:
+
+1.  **`askChat` / `askForm` (Blocking Execution)**:
+    *   **Behavior**: If the nested subwizard halts waiting for user input (throwing `StopFlow`), this stop signal is **re-thrown** up to the parent wizard.
+    *   **Effect**: The parent flow is blocked from running any statements below the nested subwizard call.
+    *   **Usage**: Use when the parent flow requires the subflow to run to 100% completion before subsequent steps can proceed.
+
+2.  **`embedChat` / `embedForm` (Parallel / Non-Blocking Execution)**:
+    *   **Behavior**: If the nested subwizard halts waiting for user input, the parent wizard **catches and suppresses** the stop signal.
+    *   **Effect**: The parent flow continues executing and renders subsequent steps in parallel while the subwizard remains active.
+    *   **Usage**: Use when you want to show a form or interactive chat inline as part of a larger, ongoing flow, without pausing other parent interactions.
+
 ## What Recause is — and is not
 
 Recause is:
@@ -853,6 +867,31 @@ Because Recause re-evaluates the entire flow tree on every keystroke or click to
 *   **The Solution**:
     *   **Action Callbacks**: Use event handlers or custom buttons (e.g., `actionButton(label, path, callback)`) whose execution only happens once upon user interaction.
     *   **Transition Guards**: Check state transitions explicitly using boolean flags to guarantee code runs exactly once (e.g. `if (isDone && !wasCounted) { increment(); setValue("wasCounted", true); }`).
+
+### 4. Premature Evaluation in Parallel Scopes (embed)
+
+Because `embedChat` or `embedForm` does not block execution of the parent flow, the statements following it are evaluated immediately and repeatedly during every input interaction inside the embedded flow.
+
+*   **The Trap**:
+    ```javascript
+    chat.embedChat("profile", profileFlow);
+    sendConfirmationEmail(); // ❌ DANGEROUS!
+    ```
+    While the user is typing their first name in the embedded profile chat, the parent flow re-runs on every keystroke. This causes `sendConfirmationEmail` to run repeatedly, sending dozens of emails before the profile is even complete.
+*   **The Solution**: Place side-effects strictly after a blocking call (`ask`), or protect them with explicit completion flags (transition guards).
+
+### 5. Stale/Incomplete Value Dependency in Parallel Scopes
+
+Reading output values from an active, non-blocking embedded wizard before it is completed can cause logic errors due to undefined or partially entered values.
+
+*   **The Trap**:
+    ```javascript
+    chat.embedForm("identity", identityFlow);
+    const email = chat.getValue("identity.email"); 
+    registerUser(email); // ❌ DANGEROUS!
+    ```
+    Since `embedForm` is non-blocking, the parent flow executes `registerUser` with `undefined` on the very first render, long before the user has actually filled in their email.
+*   **The Solution**: Never read or act on output variables from a subwizard unless you have blocked on it using `ask`, or verified its completeness state explicitly first (e.g. checking `if (isCompleted)`).
 
 ## Related work
 
