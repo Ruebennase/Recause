@@ -356,10 +356,11 @@ const wizard = new PagesWizard(
 The engine exposes:
 
 ```js
-wizard.recauseEngine.canUndo();
-wizard.recauseEngine.canRedo();
-wizard.recauseEngine.undo();
-wizard.recauseEngine.redo();
+wizard.recauseEngine.checkpoint(tag?); // Mark a checkpoint (optionally with a string tag)
+wizard.recauseEngine.canUndo(tag?);    // Check if undo is possible (optionally filtering by tag)
+wizard.recauseEngine.canRedo(tag?);    // Check if redo is possible (optionally filtering by tag)
+wizard.recauseEngine.undo(tag?);       // Restore state (optionally jumping back to matching tag)
+wizard.recauseEngine.redo(tag?);       // Replay state (optionally jumping forward to matching tag)
 ```
 
 After restoring a previous state, the flow is evaluated again and the appropriate interaction is derived from that state.
