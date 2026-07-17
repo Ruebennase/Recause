@@ -121,7 +121,7 @@
           chat.say(`Great, let's collect details for your **${type}** hobby:`);
           
           // Nest a sub-Form inside this Chat bubble flow!
-          chat.askForm("Details Form", "isSaved", function (subForm) {
+          chat.askForm("Mind filling in this little form for me?", "isSaved", function (subForm) {
             subForm.askText("Activity Name", "title", { required: true });
             subForm.askText("Hours per Week", "hours", { required: true, pattern: /^\d+$/ });
             subForm.submitButton("Save Hobby Details", "isDone", "Saved");
