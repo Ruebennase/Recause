@@ -7,12 +7,7 @@
     R_Engine = typeof require !== "undefined" ? require("./recauseEngine").RecauseEngine : null;
   }
 
-  let S_View;
-  try {
-    S_View = ScopedEngineView;
-  } catch (e) {
-    S_View = typeof require !== "undefined" ? require("./recauseEngine").ScopedEngineView : null;
-  }
+
 
   let S_Flow;
   try {
@@ -319,13 +314,13 @@
       this.instanceId = idOverride || ((typeName === "FormWizard" ? "FW_" : "CW_") + Math.random().toString(36).substr(2, 5));
 
       let isNested = false;
-      if (stateOrEngine instanceof R_Engine || stateOrEngine instanceof S_View) {
+      if (stateOrEngine instanceof R_Engine) {
         this.scopedEngine = stateOrEngine;
-        this.recauseEngine = stateOrEngine.engine || stateOrEngine;
+        this.recauseEngine = stateOrEngine.rootEngine;
         isNested = true;
       } else {
         this.recauseEngine = new R_Engine(stateOrEngine, this._wrappingFlow.bind(this), typeName);
-        this.scopedEngine = new S_View(this.recauseEngine, "");
+        this.scopedEngine = this.recauseEngine.scope("");
       }
 
       if (typeof focusManager !== "undefined" && !isNested) {

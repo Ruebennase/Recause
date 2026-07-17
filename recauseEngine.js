@@ -1,29 +1,8 @@
 /*****************************************************************************
- * Recause Framework
+ * Recause Framework - Core State Engine 
  *     - Supports frameworks and applications based on the recause programming
  *       model. Can be considered a metaframework as unlikely used on its own.
- *     - The programming model iterates over the same single flow (a programming
- *       language function) until the purpose of the flow is fulfilled.
- *       The purpose is fulfilled once a certain flow state associated with the
- *       engine instance running the flow has been reached. Then the iterations
- *       and the engine instance stop and the remaining state can be used.
- *       The flow can be arbitrarily complex and stop its own execution at any
- *       point, typically whenever necessary state is missing. Once new state
- *       is considered to have become available the next iteration starts.
- *       The programming model allows for very concisely defined domain-specific
- *       flows. And it is suitable to build derived frameworks for specific
- *       types of domain applications, making the domain-specific flows even 
- *       more concise.
- *     - The programming model - by making all relevant engine instance state
- *       explicit - allows for flows to move freely between engines running
- *       the same flow. So an executing flow is portable by suspending the
- *       flow execution and serialising the state in the original engine
- *       and loading the state and resuming the flow execution in the new
- *       engine.
- *     - The Recause Framework is new and unrefined. It has a number of 
- *       supporting functions that may be useful but may turn out to be 
- *       superfluous. Likely other supporting functions would be desirable
- *       and we only find out over time. Feedback is welcome, enjoy!
+ *     - Tagged checkpoints for multi-granularity history (undo/redo).
  * ******************************************************************************/
 
 class StopFlow extends Error {
@@ -40,19 +19,16 @@ class RestartFlow extends Error {
   }
 }
 
-function isChildrenArray(val) {
-  if (!Array.isArray(val)) return false;
-  if (val.length === 0) return true;
-  return val.every(item => 
-    Array.isArray(item) && 
-    item.length === 3 && 
-    typeof item[0] === 'string' && 
-    typeof item[2] === 'number'
-  );
-}
-
 class RecauseEngine {
-  constructor(state, flow, name, options = {}) {
+  constructor(stateOrEngine, flow, name, options = {}) {
+    if (stateOrEngine instanceof RecauseEngine) {
+      this.rootEngine = stateOrEngine.rootEngine || stateOrEngine;
+      this.prefix = (typeof flow === "string") ? flow : (options.prefix || "");
+      return;
+    }
+
+    this.rootEngine = this;
+    this.prefix = "";
     this.parentRecauseEngine = null;
     this.historyEnabled = !!options.recordHistory;
     this.stateHistory = [];
@@ -61,7 +37,7 @@ class RecauseEngine {
     this.isDraft = false;
     this.runningFlow = false;
 
-    this.loadStateOrInit(state);
+    this.loadOrInitState(stateOrEngine);
     
     this.flow = flow;
     this.name = name;
@@ -69,16 +45,22 @@ class RecauseEngine {
     this.rethrowStopFlow = true;
   }
 
-  loadStateOrInit(state) {
+  loadOrInitState(state) {
+    if (this !== this.rootEngine) {
+      this.rootEngine.loadOrInitState(state);
+      return;
+    }
+
     if (Array.isArray(state)) {
       this.stateHistory = state.length > 0 ? JSON.parse(JSON.stringify(state)) : [this._createEmptyState()];
       this.stateHistoryIndex = this.stateHistory.length - 1;
       const active = this.stateHistory[this.stateHistoryIndex];
-      this.stateTree = active.stateTree;
-      this.globalRev = active.globalRev;
+      this.values = new Map(Object.entries(active.values || {}));
+      this.revisions = new Map(Object.entries(active.revisions || {}));
+      this.globalRev = active.globalRev || 0;
     } else {
       let active;
-      if (!state || !state.stateTree) {
+      if (!state || (!state.values && !state.stateTree)) {
         active = this._createEmptyState();
       } else if (typeof state === "string") {
         active = JSON.parse(state);
@@ -87,29 +69,65 @@ class RecauseEngine {
       }
       this.stateHistory = [active];
       this.stateHistoryIndex = 0;
-      this.stateTree = active.stateTree;
-      this.globalRev = active.globalRev;
+      this.values = new Map(Object.entries(active.values || {}));
+      this.revisions = new Map(Object.entries(active.revisions || {}));
+      this.globalRev = active.globalRev || 0;
     }
     this.isDraft = false;
   }
 
   _createEmptyState() {
     return {
-      stateTree: ["root", [], 0],
-      globalRev: 0
+      values: {},
+      revisions: {},
+      globalRev: 0,
+      tags: []
     };
   }
 
-  checkpoint() {
+  checkpoint(tag) {
+    if (this !== this.rootEngine) {
+      this.rootEngine.checkpoint(tag);
+      return;
+    }
     if (!this.historyEnabled) return;
     this.isDraft = false;
+
+    if (tag && this.stateHistory[this.stateHistoryIndex]) {
+      const active = this.stateHistory[this.stateHistoryIndex];
+      if (!active.tags) active.tags = [];
+      if (!active.tags.includes(tag)) {
+        active.tags.push(tag);
+      }
+    }
   }
 
-  undo() {
-    if (this.historyEnabled && this.stateHistoryIndex > 0) {
-      this.stateHistoryIndex--;
+  undo(tag) {
+    if (this !== this.rootEngine) {
+      return this.rootEngine.undo(tag);
+    }
+    if (!this.historyEnabled) return false;
+
+    let targetIndex = -1;
+    if (tag) {
+      for (let i = this.stateHistoryIndex - 1; i >= 0; i--) {
+        const entry = this.stateHistory[i];
+        if (entry.tags && entry.tags.includes(tag)) {
+          targetIndex = i;
+          break;
+        }
+      }
+    } else {
+      if (this.stateHistoryIndex > 0) {
+        targetIndex = this.stateHistoryIndex - 1;
+      }
+    }
+
+    if (targetIndex !== -1) {
+      this.stateHistoryIndex = targetIndex;
       const active = JSON.parse(JSON.stringify(this.stateHistory[this.stateHistoryIndex]));
-      this.stateTree = active.stateTree;
+      this.values = new Map(Object.entries(active.values || {}));
+      this.revisions = new Map(Object.entries(active.revisions || {}));
       this.globalRev = active.globalRev;
       this.isDraft = false;
       this.notify();
@@ -118,11 +136,32 @@ class RecauseEngine {
     return false;
   }
 
-  redo() {
-    if (this.historyEnabled && this.stateHistoryIndex < this.stateHistory.length - 1) {
-      this.stateHistoryIndex++;
+  redo(tag) {
+    if (this !== this.rootEngine) {
+      return this.rootEngine.redo(tag);
+    }
+    if (!this.historyEnabled) return false;
+
+    let targetIndex = -1;
+    if (tag) {
+      for (let i = this.stateHistoryIndex + 1; i < this.stateHistory.length; i++) {
+        const entry = this.stateHistory[i];
+        if (entry.tags && entry.tags.includes(tag)) {
+          targetIndex = i;
+          break;
+        }
+      }
+    } else {
+      if (this.stateHistoryIndex < this.stateHistory.length - 1) {
+        targetIndex = this.stateHistoryIndex + 1;
+      }
+    }
+
+    if (targetIndex !== -1) {
+      this.stateHistoryIndex = targetIndex;
       const active = JSON.parse(JSON.stringify(this.stateHistory[this.stateHistoryIndex]));
-      this.stateTree = active.stateTree;
+      this.values = new Map(Object.entries(active.values || {}));
+      this.revisions = new Map(Object.entries(active.revisions || {}));
       this.globalRev = active.globalRev;
       this.isDraft = false;
       this.notify();
@@ -131,20 +170,43 @@ class RecauseEngine {
     return false;
   }
 
-  canUndo() {
-    return this.historyEnabled && this.stateHistoryIndex > 0;
+  canUndo(tag) {
+    if (this !== this.rootEngine) return this.rootEngine.canUndo(tag);
+    if (!this.historyEnabled) return false;
+    if (tag) {
+      for (let i = this.stateHistoryIndex - 1; i >= 0; i--) {
+        const entry = this.stateHistory[i];
+        if (entry.tags && entry.tags.includes(tag)) return true;
+      }
+      return false;
+    }
+    return this.stateHistoryIndex > 0;
   }
 
-  canRedo() {
-    return this.historyEnabled && this.stateHistoryIndex < this.stateHistory.length - 1;
+  canRedo(tag) {
+    if (this !== this.rootEngine) return this.rootEngine.canRedo(tag);
+    if (!this.historyEnabled) return false;
+    if (tag) {
+      for (let i = this.stateHistoryIndex + 1; i < this.stateHistory.length; i++) {
+        const entry = this.stateHistory[i];
+        if (entry.tags && entry.tags.includes(tag)) return true;
+      }
+      return false;
+    }
+    return this.stateHistoryIndex < this.stateHistory.length - 1;
   }
 
   getStateHistory() {
-    this.stateHistory[this.stateHistoryIndex] = JSON.parse(JSON.stringify(this.getState()));
+    if (this !== this.rootEngine) return this.rootEngine.getStateHistory();
+    const oldTags = this.stateHistory[this.stateHistoryIndex]?.tags || [];
+    const updatedEntry = JSON.parse(JSON.stringify(this.getState()));
+    updatedEntry.tags = oldTags;
+    this.stateHistory[this.stateHistoryIndex] = updatedEntry;
     return this.historyEnabled ? JSON.parse(JSON.stringify(this.stateHistory)) : [this.getState()];
   }
 
   subscribe(fn) {
+    if (this !== this.rootEngine) return this.rootEngine.subscribe(fn);
     this.listeners.push(fn);
     return () => {
       this.listeners = this.listeners.filter(l => l !== fn);
@@ -152,6 +214,7 @@ class RecauseEngine {
   }
 
   notify() {
+    if (this !== this.rootEngine) return this.rootEngine.notify();
     this.listeners.forEach(fn => fn(this.getState()));
   }
 
@@ -172,18 +235,25 @@ class RecauseEngine {
   }
 
   runFlow() {
+    if (this !== this.rootEngine) {
+      this.rootEngine.runFlow();
+      return;
+    }
     if (!this.parentRecauseEngine) console.log(this._s() + "********************" + this.name + " " + (new Date().toISOString().substr(14, 5)));
     if (this.ran && this.parentRecauseEngine) {
       console.log(this._s() + "RE before parent runFlow()" + this.name + " " + (new Date().toISOString().substr(14, 5)));
       this.parentRecauseEngine.runFlow();
-    }
-    else {
+    } else {
       console.log(this._s() + "RE before _runFlow()" + this.name + " " + (new Date().toISOString().substr(14, 5)));
       this._runFlow();
     }
   }
 
   _runFlow() {
+    if (this !== this.rootEngine) {
+      this.rootEngine._runFlow();
+      return;
+    }
     this.runningFlow = true;
     try {
       while (true) {
@@ -196,12 +266,12 @@ class RecauseEngine {
           if (e instanceof StopFlow) {
             console.log(this._s() + "RE hit StopFlow " + this.name + " " + (new Date().toISOString().substr(14, 5)));
             if (this.parentRecauseEngine && this.rethrowStopFlow)
-              throw e; // new StopFlow();
+              throw e;
             break;
           } else if (e instanceof RestartFlow) {
             console.log(this._s() + "RE hit RestartFlow " + this.name + " " + (new Date().toISOString().substr(14, 5)));
             if (this.parentRecauseEngine)
-              throw e; // new RestartFlow();
+              throw e;
             continue;
           } else {
             console.log(this._s() + "RE hit OTHER EXCEPTION " + this.name + " " + (new Date().toISOString().substr(14, 5)));
@@ -217,200 +287,26 @@ class RecauseEngine {
   }
 
   stopFlow() {
-    // Call me when waiting for mandatory values (this is by definition about this RecauseEngine's state).
     throw new StopFlow();
   }
 
   restartFlow() {
-    // Call me when some past values changed and we need to re-evaluate to become current again.
     throw new RestartFlow();
   }
 
   getState() {
+    if (this !== this.rootEngine) {
+      return this.rootEngine.getState();
+    }
     return {
-      stateTree: this.stateTree,
+      values: Object.fromEntries(this.values),
+      revisions: Object.fromEntries(this.revisions),
       globalRev: this.globalRev,
     };
   }
 
   getStateAsJSON() {
     return JSON.stringify(this.getState());
-  }
-
-  setValue(pathString, newValue) {
-    const oldVal = this.getValue(pathString);
-    if (oldVal === newValue) return;
-    if (typeof oldVal === "object" && typeof newValue === "object" && JSON.stringify(oldVal) === JSON.stringify(newValue)) {
-      return;
-    }
-
-    if (this.historyEnabled && !this.isDraft && !this.runningFlow) {
-      this.stateHistory[this.stateHistoryIndex] = JSON.parse(JSON.stringify(this.getState()));
-      this.stateHistory = this.stateHistory.slice(0, this.stateHistoryIndex + 1);
-      
-      const clone = JSON.parse(JSON.stringify(this.getState()));
-      this.stateHistory.push(clone);
-      this.stateHistoryIndex = this.stateHistory.length - 1;
-      this.isDraft = true;
-      
-      this.stateTree = clone.stateTree;
-      this.globalRev = clone.globalRev;
-    }
-
-    this._setValueAtPathArray(this._dotPathToArray(pathString), newValue);
-
-    if (this.historyEnabled) {
-      this.stateHistory[this.stateHistoryIndex] = JSON.parse(JSON.stringify(this.getState()));
-    }
-  }
-
-  getValue(pathString) {
-    return this._getValueAtPathArray(this._dotPathToArray(pathString));
-  }
-
-  getValueElseStop(pathString) {
-    const value = this.getValue(pathString);
-    if (value == undefined)
-      this.stopFlow();
-    return value;
-  }
-
-  getValueOrDefault(pathString, defaultVal) {
-    const value = this.getValue(pathString);
-    return value == undefined ? defaultVal : value;
-  }
-
-  hasValue(pathString) {
-    const value = this.getValue(pathString);
-    return value == undefined ? false : true;
-  }
-
-  removeValue(pathString) {
-    this._removeNodeAtPathArray(this._dotPathToArray(pathString));
-  }
-
-  revisionValue(pathString) {
-    return this._getRevisionAtPathArray(this._dotPathToArray(pathString));
-  }
-
-  ageValue(pathString) {
-    const rev = this.revisionValue(pathString);
-    return (typeof rev !== "number") ? Infinity : (this.globalRev - rev + 1);
-  }
-
-  forceValueOrder(olderPathStr, newerPathStr) {
-    if (this.revisionValue(olderPathStr) >= this.revisionValue(newerPathStr))
-      this.removeValue(newerPathStr);
-  }
-
-  getLevel() {
-    return this.level;
-  }
-
-  _dotPathToArray(dotPath) {
-    return !dotPath ? [] : dotPath.split(".");
-  }
-
-  _getNodeByPath(pathArray, createIfMissing = false) {
-    const chain = [this.stateTree];
-    let currentNode = this.stateTree;
-
-    for (const path of pathArray) {
-      let children = isChildrenArray(currentNode[1]) ? currentNode[1] : null;
-      if (!children) {
-        if (!createIfMissing) {
-          return [null, chain];
-        }
-        currentNode[1] = [];
-        children = currentNode[1];
-      }
-      let child = children.find((c) => c[0] === path);
-      if (!child && createIfMissing) {
-        child = [path, [], 0];
-        children.push(child);
-      } else if (!child) {
-        return [null, chain];
-      }
-      chain.push(child);
-      currentNode = child;
-    }
-
-    return [currentNode, chain];
-  }
-
-  _setValueAtPathArray(pathArray, newValue) {
-    this.globalRev++;
-    const newRev = this.globalRev;
-
-    const [targetNode, chain] = this._getNodeByPath(pathArray, true);
-    if (!targetNode) return;
-
-    targetNode[1] = newValue;
-    targetNode[2] = newRev;
-
-    for (const ancestor of chain.slice(0, -1)) {
-      ancestor[2] = newRev;
-    }
-  }
-
-  _getValueAtPathArray(pathArray) {
-    const [node] = this._getNodeByPath(pathArray, false);
-    return node ? node[1] : undefined;
-  }
-
-  _getRevisionAtPathArray(pathArray) {
-    const [node] = this._getNodeByPath(pathArray, false);
-    return node ? node[2] : undefined;
-  }
-
-  _removeNodeAtPathArray(pathArray) {
-    if (pathArray.length === 0) {
-      return;
-    }
-    const parentPath = pathArray.slice(0, -1);
-    const pathToRemove = pathArray[pathArray.length - 1];
-
-    const [parentNode, chain] = this._getNodeByPath(parentPath, false);
-    if (!parentNode) return;
-
-    const children = isChildrenArray(parentNode[1]) ? parentNode[1] : null;
-    if (!children) return;
-
-    const idx = children.findIndex((c) => c[0] === pathToRemove);
-    if (idx === -1) {
-      return;
-    }
-    children.splice(idx, 1);
-
-    this.globalRev++;
-    const newRev = this.globalRev;
-    for (const ancestor of chain) {
-      ancestor[2] = newRev;
-    }
-  }
-
-  getAPI() {
-    return {
-      stopFlow: this.stopFlow.bind(this),
-      restartFlow: this.restartFlow.bind(this),
-      setValue: this.setValue.bind(this),
-      hasValue: this.hasValue.bind(this),
-      getValue: this.getValue.bind(this),
-      getValueElseStop: this.getValueElseStop.bind(this),
-      getValueOrDefault: this.getValueOrDefault.bind(this),
-      revisionValue: this.revisionValue.bind(this),
-      ageValue: this.ageValue.bind(this),
-      removeValue: this.removeValue.bind(this),
-      getState: this.getState.bind(this),
-      getStateAsJSON: this.getStateAsJSON.bind(this),
-    };
-  }
-}
-
-class ScopedEngineView {
-  constructor(engine, prefix) {
-    this.engine = engine;
-    this.prefix = prefix;
   }
 
   _resolvePath(path) {
@@ -421,67 +317,127 @@ class ScopedEngineView {
     return this.prefix ? `${this.prefix}.${path}` : path;
   }
 
-  setValue(path, newValue) {
-    this.engine.setValue(this._resolvePath(path), newValue);
-  }
-
-  getValue(path) {
-    return this.engine.getValue(this._resolvePath(path));
-  }
-
-  getValueElseStop(path) {
-    const val = this.getValue(path);
-    if (val === undefined) {
-      this.stopFlow();
+  setValue(pathString, newValue) {
+    if (this !== this.rootEngine) {
+      this.rootEngine.setValue(this._resolvePath(pathString), newValue);
+      return;
     }
-    return val;
+
+    const resolvedPath = this._resolvePath(pathString);
+    const oldVal = this.values.get(resolvedPath);
+    if (oldVal === newValue) return;
+    if (typeof oldVal === "object" && typeof newValue === "object" && JSON.stringify(oldVal) === JSON.stringify(newValue)) {
+      return;
+    }
+
+    if (this.historyEnabled && !this.isDraft && !this.runningFlow) {
+      const oldTags = this.stateHistory[this.stateHistoryIndex]?.tags || [];
+      const updatedEntry = JSON.parse(JSON.stringify(this.getState()));
+      updatedEntry.tags = oldTags;
+      this.stateHistory[this.stateHistoryIndex] = updatedEntry;
+
+      this.stateHistory = this.stateHistory.slice(0, this.stateHistoryIndex + 1);
+      
+      const clone = JSON.parse(JSON.stringify(this.getState()));
+      clone.tags = [];
+      this.stateHistory.push(clone);
+      this.stateHistoryIndex = this.stateHistory.length - 1;
+      this.isDraft = true;
+      
+      this.values = new Map(Object.entries(clone.values));
+      this.revisions = new Map(Object.entries(clone.revisions));
+      this.globalRev = clone.globalRev;
+    }
+
+    this.globalRev++;
+    this.values.set(resolvedPath, newValue);
+    this.revisions.set(resolvedPath, this.globalRev);
+
+    // Propagate revision updates to parent paths
+    let parent = resolvedPath;
+    while (parent.includes('.')) {
+      parent = parent.substring(0, parent.lastIndexOf('.'));
+      this.revisions.set(parent, this.globalRev);
+    }
+
+    if (this.historyEnabled) {
+      const oldTags = this.stateHistory[this.stateHistoryIndex]?.tags || [];
+      const updatedEntry = JSON.parse(JSON.stringify(this.getState()));
+      updatedEntry.tags = oldTags;
+      this.stateHistory[this.stateHistoryIndex] = updatedEntry;
+    }
   }
 
-  getValueOrDefault(path, defaultVal) {
-    const val = this.getValue(path);
-    return val === undefined ? defaultVal : val;
+  getValue(pathString) {
+    if (this !== this.rootEngine) {
+      return this.rootEngine.getValue(this._resolvePath(pathString));
+    }
+    return this.values.get(this._resolvePath(pathString));
   }
 
-  hasValue(path) {
-    return this.getValue(path) !== undefined;
+  getValueElseStop(pathString) {
+    const value = this.getValue(pathString);
+    if (value === undefined)
+      this.stopFlow();
+    return value;
   }
 
-  removeValue(path) {
-    this.engine.removeValue(this._resolvePath(path));
+  getValueOrDefault(pathString, defaultVal) {
+    const value = this.getValue(pathString);
+    return value === undefined ? defaultVal : value;
   }
 
-  revisionValue(path) {
-    return this.engine.revisionValue(this._resolvePath(path));
+  hasValue(pathString) {
+    return this.getValue(pathString) !== undefined;
   }
 
-  ageValue(path) {
-    return this.engine.ageValue(this._resolvePath(path));
+  removeValue(pathString) {
+    if (this !== this.rootEngine) {
+      this.rootEngine.removeValue(this._resolvePath(pathString));
+      return;
+    }
+    const resolvedPath = this._resolvePath(pathString);
+    this.values.delete(resolvedPath);
+    this.revisions.delete(resolvedPath);
+
+    // Delete nested sub-paths
+    const prefix = resolvedPath + ".";
+    for (const key of this.values.keys()) {
+      if (key.startsWith(prefix)) {
+        this.values.delete(key);
+        this.revisions.delete(key);
+      }
+    }
+
+    this.globalRev++;
+    let parent = resolvedPath;
+    while (parent.includes('.')) {
+      parent = parent.substring(0, parent.lastIndexOf('.'));
+      this.revisions.set(parent, this.globalRev);
+    }
+  }
+
+  revisionValue(pathString) {
+    if (this !== this.rootEngine) {
+      return this.rootEngine.revisionValue(this._resolvePath(pathString));
+    }
+    return this.revisions.get(this._resolvePath(pathString));
+  }
+
+  ageValue(pathString) {
+    const rev = this.revisionValue(pathString);
+    return (typeof rev !== "number") ? Infinity : (this.globalRev - rev + 1);
   }
 
   forceValueOrder(olderPathStr, newerPathStr) {
+    // Relative revision age check: automatically clears dependent field if the older field is edited.
     if (this.revisionValue(olderPathStr) >= this.revisionValue(newerPathStr))
       this.removeValue(newerPathStr);
   }
 
-  stopFlow() {
-    this.engine.stopFlow();
-  }
-
-  restartFlow() {
-    this.engine.restartFlow();
-  }
-
-  getState() {
-    return this.engine.getState();
-  }
-
-  getStateAsJSON() {
-    return this.engine.getStateAsJSON();
-  }
-
   scope(subPrefix) {
     const newPrefix = this.prefix ? `${this.prefix}.${subPrefix}` : subPrefix;
-    return new ScopedEngineView(this.engine, newPrefix);
+    return new RecauseEngine(this, null, null, { prefix: newPrefix });
   }
 
   getAPI() {
@@ -506,7 +462,6 @@ class ScopedEngineView {
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     RecauseEngine,
-    ScopedEngineView,
     StopFlow,
     RestartFlow
   };

@@ -10,12 +10,12 @@ class PagesWizard {
       focusManager.registerContainer(this.container);
     }
 
-    if (stateOrEngine instanceof RecauseEngine || stateOrEngine instanceof ScopedEngineView) {
+    if (stateOrEngine instanceof RecauseEngine) {
       this.scopedEngine = stateOrEngine;
-      this.recauseEngine = stateOrEngine.engine || stateOrEngine;
+      this.recauseEngine = stateOrEngine.rootEngine;
     } else {
       this.recauseEngine = new RecauseEngine(stateOrEngine, this.#wrappingFlow, "PagesWizard", options);
-      this.scopedEngine = new ScopedEngineView(this.recauseEngine, "");
+      this.scopedEngine = this.recauseEngine.scope("");
     }
     
     this.flow = flow;
